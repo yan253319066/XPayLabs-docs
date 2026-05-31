@@ -1,152 +1,77 @@
 ---
-title: "Understanding the XPayLabs Payment Object and Lifecycle"
+title: "Understanding Collection Orders — The Core of XPayLabs Payments"
 sidebarTitle: "Payments"
-description: "Learn how XPayLabs models payments: the lifecycle from authorization to capture, every payment status, and all key fields on the Payment object."
+description: "Learn how XPayLabs models payment collection: the lifecycle of a collection order from creation to on-chain confirmation, order statuses, and the PaymentAddress object."
 ---
 
-A Payment object is the core building block of the XPayLabs platform. Every time a customer submits their payment details, XPayLabs creates a Payment object that tracks the full lifecycle of that transaction — from the initial authorization request through processing, confirmation, and eventual settlement to your bank account. Understanding how payments are structured and how they move through states helps you build reliable integrations and handle edge cases gracefully.
+A **Collection Order** is the core payment primitive in XPayLabs. When a customer wants to pay you in cryptocurrency, your server creates a collection order through the API. The gateway generates a unique deposit address for that specific transaction, monitors the blockchain for incoming funds, and notifies your server when payment is confirmed.
 
-## Payment Lifecycle
-
-Every payment moves through a defined sequence of states from the moment it is initiated until the funds are settled into your account. The diagram below describes each stage in that journey.
+## Collection Lifecycle
 
 <Steps>
-  <Step title="Initiated">
-    Your server calls `POST /v1/payments` with the amount, currency, and payment method. XPayLabs creates a Payment object with status `pending` and returns it immediately.
+  <Step title="Order Created">
+    Your server calls `POST /v1/order/createCollection` with the amount, symbol, and chain. The gateway creates an order with status `INIT` and returns a unique deposit address and checkout URL.
   </Step>
-  <Step title="Processing">
-    XPayLabs submits the authorization request to the card network or payment processor. The payment status moves to `processing`. This step typically completes in seconds but may take longer depending on the payment method.
+  <Step title="Awaiting Payment">
+    The order moves to `PENDING`. The customer sees the deposit address and a QR code on the checkout page. The order has a configurable expiry time.
   </Step>
-  <Step title="Succeeded or Failed">
-    The processor returns an approval or decline. A successful authorization moves the payment to `succeeded`. A decline, network error, or fraud signal moves it to `failed`. At this point, funds are authorized (reserved) on the customer's account.
+  <Step title="Transaction Detected">
+    The blockchain scanner detects an incoming transaction matching the amount and deposit address. The status changes to `PENDING_CONFIRMATION`. A webhook (`ORDER_PENDING_CONFIRMATION`) is sent with the transaction details.
   </Step>
-  <Step title="Settled">
-    XPayLabs batches authorized payments and submits them for capture and settlement. Once settled, the net proceeds are transferred to your configured bank account. The payment's `settlement_id` field is populated with a reference to the corresponding settlement batch.
+  <Step title="Confirmed">
+    After the required number of block confirmations (configurable per chain), the order status changes to `SUCCESS`. A webhook (`ORDER_SUCCESS`) is sent. The funds are now in your gateway hot wallet.
+  </Step>
+  <Step title="Expired or Failed">
+    If no payment arrives before the expiry time, the order status moves to `EXPIRED`. If the transaction fails validation, it moves to `FAILED`.
   </Step>
 </Steps>
 
-## Payment Statuses
-
-XPayLabs assigns one of the following statuses to every Payment object at any given moment. You can read the current status from the `status` field of the payment response or listen for status changes via webhooks.
+## Order Statuses
 
 | Status | Description |
 |---|---|
-| `pending` | The payment has been created but has not yet been submitted to the payment processor. |
-| `processing` | XPayLabs has submitted the payment and is waiting for a response from the processor or card network. |
-| `succeeded` | The payment was authorized and captured successfully. Funds are reserved and will be settled. |
-| `failed` | The payment was declined or encountered an error during processing. No funds were captured. |
-| `canceled` | The payment was explicitly canceled before capture, either by your server or through the Dashboard. |
+| `INIT` | Order created, deposit address generated |
+| `PENDING` | Awaiting customer payment |
+| `PENDING_CONFIRMATION` | Transaction detected, waiting for block confirmations |
+| `SUCCESS` | Payment confirmed, funds available |
+| `EXPIRED` | Order expired without receiving payment |
+| `FAILED` | Collection or payout failed |
 
-## Payment Object
+## Collection Flow Diagram
 
-The following example shows the key fields returned in a Payment object. Use these fields to track transaction state, reconcile records, and attach contextual data.
-
-```json
-{
-  "id": "pay_abc123xyz",
-  "object": "payment",
-  "amount": 4999,
-  "currency": "usd",
-  "status": "succeeded",
-  "payment_method": {
-    "type": "card",
-    "card": {
-      "brand": "visa",
-      "last4": "4242",
-      "exp_month": 12,
-      "exp_year": 2027
-    }
-  },
-  "description": "Order #8821 — Widget XL Blue",
-  "idempotency_key": "order_8821_attempt_1",
-  "settlement_id": "stl_7gHkLmN2pQ",
-  "failure_code": null,
-  "failure_message": null,
-  "metadata": {
-    "order_id": "order_8821",
-    "customer_email": "jane@example.com"
-  },
-  "created_at": "2024-11-14T10:23:45Z",
-  "updated_at": "2024-11-14T10:23:47Z"
-}
+```
+Merchant Server          XPayLabs Gateway          Blockchain           Customer
+     |                         |                       |                    |
+     |-- POST /createCollection -->|                    |                    |
+     |<-- PaymentAddress ---------|                    |                    |
+     |                         |                       |                    |
+     |                         |                       |<-- sends funds ----|
+     |                         |<-- scanner detects ---|                    |
+     |<-- Webhook: PENDING_CONFIRMATION                |                    |
+     |                         |                       |                    |
+     |                         |<-- block confirmed ---|                    |
+     |<-- Webhook: ORDER_SUCCESS                       |                    |
 ```
 
-<Note>
-  The `amount` field is always expressed in the **smallest currency unit**. For USD, that means cents — so `4999` represents **$49.99**. For zero-decimal currencies like JPY, the value represents the exact amount (e.g., `500` = ¥500). Always convert before displaying amounts to customers.
-</Note>
+## PaymentAddress Object
 
-<CardGroup cols={2}>
-  <Card title="id" icon="fingerprint">
-    A unique identifier for the payment, prefixed with `pay_`. Use this ID to retrieve, update, or reference the payment in other API calls.
-  </Card>
-  <Card title="amount" icon="dollar-sign">
-    The payment amount in the smallest currency unit (e.g., cents for USD). Must be a positive integer.
-  </Card>
-  <Card title="currency" icon="globe">
-    A three-letter ISO 4217 currency code (e.g., `usd`, `eur`, `gbp`). Must match the currency configured for your account.
-  </Card>
-  <Card title="status" icon="circle-check">
-    The current lifecycle state of the payment. Subscribe to webhooks to receive real-time status change notifications.
-  </Card>
-  <Card title="payment_method" icon="credit-card">
-    A nested object describing the payment instrument used — card details, wallet type, or bank account — depending on the payment method.
-  </Card>
-  <Card title="description" icon="tag">
-    An optional free-text description of the payment visible in your Dashboard and settlement reports. Useful for labeling orders or subscription charges.
-  </Card>
-  <Card title="failure_code" icon="circle-xmark">
-    A short machine-readable string present when `status` is `failed` (e.g., `card_declined`, `insufficient_funds`). Use this field in your error-handling logic.
-  </Card>
-  <Card title="failure_message" icon="message">
-    A human-readable explanation of why the payment failed. Present only when `status` is `failed`. Do not display this string verbatim to end users.
-  </Card>
-  <Card title="created_at" icon="clock">
-    ISO 8601 timestamp of when the payment was created. All timestamps are in UTC.
-  </Card>
-  <Card title="updated_at" icon="clock-rotate-left">
-    ISO 8601 timestamp of the most recent update to the payment object, such as a status transition. All timestamps are in UTC.
-  </Card>
-</CardGroup>
+When you create a collection, the gateway returns a `PaymentAddress` object:
 
-## Idempotency
+| Field | Description |
+|---|---|
+| `address` | Unique deposit address for this collection |
+| `amount` | The requested amount |
+| `symbol` | Token symbol (e.g., USDT) |
+| `chain` | Blockchain network |
+| `orderId` | Your order identifier |
+| `uid` | Your user identifier |
+| `expiredTime` | Order expiry timestamp |
+| `paymentUrl` | Checkout page URL with QR code |
 
-Network failures and timeouts can cause uncertainty about whether a payment request was received and processed. To prevent accidental duplicate charges, pass an `idempotency_key` in the request header when creating a payment.
+## Amount Format
 
-```bash
-curl -X POST https://api.xpaylabs.com/v1/payments \
-  -H "Authorization: Bearer sk_test_abc123" \
-  -H "Idempotency-Key: order_8821_attempt_1" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "amount": 4999,
-    "currency": "usd",
-    "payment_method_id": "pm_card9xTz11"
-  }'
-```
+All amounts are **string-formatted decimals** (e.g., `"100.00"`). This avoids floating-point precision issues common in JavaScript when dealing with large numbers. The internal representation uses `BigDecimal` in the Java backend, ensuring exact precision.
 
-When you supply an `idempotency_key`, XPayLabs stores the response for that key for **24 hours**. If you retry the same request with the same key within that window — for example, after a timeout — XPayLabs returns the original response without creating a new payment. This guarantees exactly-once semantics for payment creation.
+## Deposit Addresses
 
-<Accordion title="Idempotency key best practices">
-  - Generate keys that are unique per logical operation, not per HTTP request. Tie them to your internal order or transaction ID so retries use the same key.
-  - Keys can be any string up to 255 characters. UUIDs (`a1b2c3d4-...`) or prefixed identifiers (`order_8821_attempt_1`) both work well.
-  - Do not reuse a key for a genuinely different payment. If an earlier payment with that key succeeded, XPayLabs returns the original successful payment instead of creating a new one.
-  - Idempotency keys are scoped to your API key. The same key used with different API keys creates separate records.
-</Accordion>
-
-## Metadata
-
-The `metadata` field lets you attach up to 50 key-value pairs of your own data to any Payment object. XPayLabs stores and returns this data as-is and does not use it in payment processing. Metadata is a convenient way to correlate XPayLabs payments with records in your own database without maintaining a separate mapping table.
-
-```json
-{
-  "metadata": {
-    "order_id": "order_8821",
-    "customer_id": "cus_00124",
-    "customer_email": "jane@example.com",
-    "product_sku": "WIDGET-XL-BLU",
-    "region": "us-west"
-  }
-}
-```
-
-Keys and values must both be strings. Values are limited to 500 characters each. You can update metadata on an existing payment with `PATCH /v1/payments/{id}` without affecting its processing state.
+Each collection order gets a **unique, single-use deposit address**. This provides clear on-chain attribution — you can always identify which customer paid for which order by looking at the deposit address in the blockchain transaction. Addresses are generated deterministically from your gateway's HD wallet seed, so they never need to be pre-generated or stored externally.

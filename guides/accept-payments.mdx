@@ -1,273 +1,214 @@
 ---
-title: "Accept Card and Wallet Payments via the XPayLabs API"
+title: "Accept Crypto Payments with XPayLabs Collection Orders"
 sidebarTitle: "Accept Payments"
-description: "Step-by-step guide to integrating XPayLabs to accept card payments, digital wallets, and local payment methods in your checkout flow."
+description: "Step-by-step guide to accepting stablecoin payments via XPayLabs. Create a collection order, generate a checkout page, and handle the webhook callback."
 ---
 
-Building a payment acceptance flow with XPayLabs lets you securely collect and process payments from customers around the world. The integration combines a lightweight client-side library — XPayLabs.js — with a server-side API call to create a PaymentIntent. This separation ensures that raw card data never touches your servers, keeping you out of PCI scope while giving you full control over the checkout experience.
+This guide walks through the complete flow of accepting a crypto payment using XPayLabs — from creating a collection order to confirming the on-chain payment via webhook.
 
-## Supported Payment Methods
+## The Payment Flow
 
-| Method | Type | Regions |
-|---|---|---|
-| Visa / Mastercard | Card | Global |
-| American Express | Card | Global |
-| Apple Pay | Digital Wallet | iOS / macOS Safari |
-| Google Pay | Digital Wallet | Android / Chrome |
-| Local methods (iDEAL, SEPA, Boleto, etc.) | Local | Region-specific |
+1. Your server creates a collection order via the API.
+2. The gateway returns a unique deposit address and checkout URL.
+3. Your customer sends USDT (or another supported token) to the deposit address.
+4. The blockchain scanner detects the transaction.
+5. The gateway sends a webhook to your server when payment is confirmed.
 
-## Integration Steps
+---
 
-<Steps>
-  <Step title="Collect payment details (client-side)">
-    Use **XPayLabs.js** or the hosted fields embed to tokenize card data directly in the browser. The library communicates with XPayLabs servers and returns a short-lived `payment_method_token` — your server never sees the raw card number.
+## Step 1: Create a Collection Order
 
-    Add the script to your checkout page:
-
-    ```html
-    <script src="https://js.xpaylabs.com/v1/xpaylabs.js"></script>
-    ```
-
-    Initialize the hosted card field and mount it to a container element:
-
-    ```javascript
-    const xpay = XPayLabs("sk_test_abc123");
-    const cardField = xpay.elements().create("card");
-    cardField.mount("#card-element");
-
-    // When the customer submits the form, tokenize the card
-    const form = document.getElementById("payment-form");
-    form.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const { token, error } = await xpay.createToken(cardField);
-      if (error) {
-        // Display error.message to the customer
-        document.getElementById("error-message").textContent = error.message;
-      } else {
-        // Send token.id to your server as payment_method_token
-        await submitPayment(token.id);
-      }
-    });
-    ```
-
-    <Note>
-      XPayLabs's hosted fields are rendered in an XPayLabs-owned iframe. Because raw card data is tokenized entirely within that iframe, your integration qualifies for the simplest PCI DSS compliance tier (SAQ A) — you never handle, store, or transmit cardholder data.
-    </Note>
-  </Step>
-
-  <Step title="Create a PaymentIntent (server-side)">
-    Once you have a `payment_method_token` from the client, send it to your server and create a PaymentIntent by calling `POST /v1/payments`. Always specify `amount` in the smallest currency unit (e.g., cents for USD).
-
-    ```javascript
-    // Node.js / Express example
-    const express = require("express");
-    const axios = require("axios");
-    const app = express();
-
-    app.use(express.json());
-
-    app.post("/api/create-payment", async (req, res) => {
-      const { paymentMethodToken, amount, currency } = req.body;
-
-      try {
-        const response = await axios.post(
-          "https://api.xpaylabs.com/v1/payments",
-          {
-            amount,                          // e.g. 4999 for $49.99
-            currency,                        // e.g. "usd"
-            payment_method_token: paymentMethodToken,
-            description: "Order #1042",
-            metadata: { order_id: "1042" },
-          },
-          {
-            headers: {
-              Authorization: `Bearer ${process.env.XPAYLABS_SECRET_KEY}`,
-              "Content-Type": "application/json",
-              "Idempotency-Key": `order-1042-${Date.now()}`,
-            },
-          }
-        );
-
-        res.json({ payment: response.data });
-      } catch (err) {
-        res.status(400).json({ error: err.response?.data ?? err.message });
-      }
-    });
-
-    app.listen(3000);
-    ```
-
-    **Required fields for `POST /v1/payments`:**
-
-    | Field | Type | Description |
-    |---|---|---|
-    | `amount` | integer | Amount in smallest currency unit (e.g., cents) |
-    | `currency` | string | ISO 4217 currency code (e.g., `usd`, `eur`) |
-    | `payment_method_token` | string | Token returned by XPayLabs.js |
-    | `description` | string | Optional human-readable label for the payment |
-    | `metadata` | object | Optional key-value pairs for your internal records |
-    | `idempotency_key` | string | Optional unique key to prevent duplicate charges |
-  </Step>
-
-  <Step title="Handle the response">
-    The API returns a payment object. Inspect the `status` field to determine next steps:
-
-    ```json
-    {
-      "id": "pay_abc123xyz",
-      "object": "payment",
-      "amount": 4999,
-      "currency": "usd",
-      "status": "succeeded",
-      "payment_method_token": "tok_visa_4242",
-      "description": "Order #1042",
-      "created_at": "2024-06-01T12:34:56Z"
-    }
-    ```
-
-    | Status | Meaning | Action |
-    |---|---|---|
-    | `succeeded` | Payment captured successfully | Fulfill the order |
-    | `requires_action` | Strong customer authentication needed | Follow Step 4 |
-    | `failed` | Payment declined or errored | Show failure message; prompt retry |
-
-    For `failed` payments, the response also includes a `failure_code` and `failure_message` field you can display to the customer (e.g., `"card_declined"`, `"insufficient_funds"`).
-  </Step>
-
-  <Step title="Handle 3DS / requires_action">
-    When `status` is `requires_action`, the response includes a `next_action` object describing what your client must do. The most common type is `redirect_to_url` for 3D Secure authentication.
-
-    ```json
-    {
-      "id": "pay_abc123xyz",
-      "status": "requires_action",
-      "next_action": {
-        "type": "redirect_to_url",
-        "redirect_to_url": {
-          "url": "https://hooks.xpaylabs.com/3ds/auth?session=sess_xyz",
-          "return_url": "https://yoursite.com/checkout/complete"
-        }
-      }
-    }
-    ```
-
-    Use XPayLabs.js to handle this automatically — it manages the redirect or modal display transparently:
-
-    ```javascript
-    const { payment, error } = await xpay.handleNextAction(paymentId);
-    if (error) {
-      // Authentication failed — show error to customer
-    } else if (payment.status === "succeeded") {
-      // Authentication succeeded — fulfill order
-    }
-    ```
-
-    If you prefer to redirect manually, send the customer to `next_action.redirect_to_url.url`. After authentication, XPayLabs redirects back to your `return_url` with a `payment_id` query parameter.
-  </Step>
-
-  <Step title="Confirm payment success">
-    After handling any required actions, confirm the final payment state through either of these approaches:
-
-    **Option A — Webhooks (recommended):** Register a `payment.succeeded` webhook in your Dashboard. XPayLabs sends a signed POST request to your endpoint when the payment is captured. This is the most reliable method because it works even if the customer closes their browser.
-
-    ```javascript
-    app.post("/webhooks/xpaylabs", express.raw({ type: "application/json" }), (req, res) => {
-      const signature = req.headers["x-xpaylabs-signature"];
-      let event;
-
-      try {
-        event = xpay.webhooks.constructEvent(
-          req.body,
-          signature,
-          process.env.XPAYLABS_WEBHOOK_SECRET
-        );
-      } catch (err) {
-        return res.status(400).send(`Webhook signature verification failed: ${err.message}`);
-      }
-
-      if (event.type === "payment.succeeded") {
-        const payment = event.data.object; // pay_abc123xyz
-        // Fulfill the order for payment.metadata.order_id
-      }
-
-      res.json({ received: true });
-    });
-    ```
-
-    **Option B — Poll the API:** Retrieve the payment by ID until its status is terminal:
-
-    ```bash
-    curl https://api.xpaylabs.com/v1/payments/pay_abc123xyz \
-      -H "Authorization: Bearer sk_test_abc123"
-    ```
-  </Step>
-</Steps>
-
-## Complete Server-Side Example
-
-The following Express endpoint combines all server-side steps into a single, production-ready handler:
+Call `POST /v1/order/createCollection` with the payment details:
 
 ```javascript
-const express = require("express");
-const axios = require("axios");
-const { v4: uuidv4 } = require("uuid");
+import crypto from "crypto";
 
-const router = express.Router();
+const GATEWAY_URL = "http://your-gateway:3010";
+const MERCHANT_TOKEN = process.env.XPAYLABS_TOKEN;
 
-router.post("/checkout", async (req, res) => {
-  const { paymentMethodToken, amount, currency, orderId } = req.body;
+function signRequest(data) {
+  return crypto
+    .createHmac("sha256", MERCHANT_TOKEN)
+    .update(JSON.stringify(data), "utf8")
+    .digest("hex");
+}
 
-  if (!paymentMethodToken || !amount || !currency || !orderId) {
-    return res.status(422).json({ error: "Missing required fields." });
+async function createCollection(amount, orderId) {
+  const data = {
+    amount: amount,         // e.g. "100.00"
+    symbol: "USDT",
+    chain: "TRON",
+    orderId: orderId,       // your internal order ID
+  };
+
+  const payload = {
+    sign: signRequest(data),
+    timestamp: Math.floor(Date.now() / 1000),
+    nonce: crypto.randomUUID(),
+    data,
+  };
+
+  const response = await fetch(`${GATEWAY_URL}/v1/order/createCollection`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  const result = await response.json();
+  if (result.code !== 200) throw new Error(result.msg);
+
+  return result.data; // PaymentAddress object
+}
+
+// Usage
+const payment = await createCollection("100.00", "order_1042");
+console.log(`Send USDT to: ${payment.address}`);
+console.log(`Checkout page: ${payment.paymentUrl}`);
+```
+
+### Response
+
+```json
+{
+  "code": 200,
+  "msg": "success",
+  "data": {
+    "address": "TWkKZkmuB8DpVeiMoHiKf99ZoFHzk73CqR",
+    "amount": "100.00",
+    "symbol": "USDT",
+    "chain": "TRON",
+    "orderId": "order_1042",
+    "expiredTime": 1717086400,
+    "paymentUrl": "http://your-gateway:3010/checkout?orderId=order_1042"
+  }
+}
+```
+
+---
+
+## Step 2: Present the Payment to Your Customer
+
+Direct your customer to the `paymentUrl` — a hosted checkout page that displays the deposit address, QR code, and payment instructions. Or embed the address directly in your own interface:
+
+```html
+<div class="payment-info">
+  <p>Send <strong>100 USDT</strong> on TRON to:</p>
+  <code>TWkKZkmuB8DpVeiMoHiKf99ZoFHzk73CqR</code>
+  <p>Expires: <span id="countdown"></span></p>
+  <img src="https://chart.googleapis.com/chart?chs=250x250&cht=qr&chl=TWkKZkmuB8DpVeiMoHiKf99ZoFHzk73CqR" />
+</div>
+```
+
+---
+
+## Step 3: Handle the Webhook Notification
+
+Configure your callback URL in the gateway. When payment is detected and confirmed, the gateway sends a signed `POST` request:
+
+```javascript
+// Express.js webhook handler
+import express from "express";
+import crypto from "crypto";
+
+const app = express();
+app.use(express.json());
+
+const WEBHOOK_SECRET = process.env.XPAYLABS_WEBHOOK_SECRET;
+
+app.post("/webhooks/xpaylabs", (req, res) => {
+  const payload = req.body;
+
+  // Verify signature
+  const dataJson = JSON.stringify(payload.data);
+  const expectedSign = crypto
+    .createHmac("sha256", WEBHOOK_SECRET)
+    .update(dataJson, "utf8")
+    .digest("hex");
+
+  if (expectedSign !== payload.sign) {
+    return res.status(400).send("Invalid signature");
   }
 
-  try {
-    const { data: payment } = await axios.post(
-      "https://api.xpaylabs.com/v1/payments",
-      {
-        amount,
-        currency,
-        payment_method_token: paymentMethodToken,
-        description: `Order #${orderId}`,
-        metadata: { order_id: orderId },
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${process.env.XPAYLABS_SECRET_KEY}`,
-          "Content-Type": "application/json",
-          "Idempotency-Key": `checkout-${orderId}-${uuidv4()}`,
-        },
-      }
-    );
+  // Route by event type
+  switch (payload.notifyType) {
+    case "ORDER_PENDING":
+      console.log("Order created, awaiting payment");
+      break;
 
-    switch (payment.status) {
-      case "succeeded":
-        // Mark order as paid in your database
-        return res.json({ status: "succeeded", paymentId: payment.id });
+    case "ORDER_PENDING_CONFIRMATION":
+      console.log("Payment detected, awaiting confirmations");
+      // Update order status in your database
+      break;
 
-      case "requires_action":
-        // Return next_action details to the client
-        return res.json({
-          status: "requires_action",
-          paymentId: payment.id,
-          nextAction: payment.next_action,
-        });
+    case "ORDER_SUCCESS":
+      console.log(`Payment confirmed for order ${payload.data.orderId}`);
+      // Fulfill the order — release goods, update database
+      break;
 
-      case "failed":
-        return res.status(402).json({
-          status: "failed",
-          failureCode: payment.failure_code,
-          message: payment.failure_message,
-        });
-
-      default:
-        return res.status(500).json({ error: "Unexpected payment status." });
-    }
-  } catch (err) {
-    console.error("Payment creation error:", err.response?.data ?? err.message);
-    return res.status(500).json({ error: "Payment processing failed. Please try again." });
+    case "ORDER_EXPIRED":
+      console.log(`Order ${payload.data.orderId} expired`);
+      // Mark as expired in your system
+      break;
   }
+
+  res.status(200).send("ok");
 });
 
-module.exports = router;
+app.listen(3000);
 ```
+
+---
+
+## Step 4: Poll Order Status (Alternative to Webhooks)
+
+If you cannot receive webhooks, poll the status endpoint:
+
+```javascript
+async function getOrderStatus(orderId, token) {
+  const sign = crypto
+    .createHmac("sha256", token)
+    .update(orderId, "utf8")
+    .digest("hex");
+
+  const response = await fetch(
+    `http://your-gateway:3010/v1/order/getOrderStatus?orderId=${orderId}&sign=${sign}`
+  );
+  const result = await response.json();
+  return result.data.status;
+}
+
+// Poll every 3 seconds until confirmed or expired
+async function waitForPayment(orderId, token) {
+  return new Promise((resolve) => {
+    const interval = setInterval(async () => {
+      const status = await getOrderStatus(orderId, token);
+      if (status === "SUCCESS") {
+        clearInterval(interval);
+        resolve(true);
+      } else if (status === "EXPIRED" || status === "FAILED") {
+        clearInterval(interval);
+        resolve(false);
+      }
+    }, 3000);
+  });
+}
+```
+
+---
+
+## Supported Chains
+
+When creating a collection, specify the `chain` parameter:
+
+| Chain | Value | Tokens |
+|---|---|---|
+| TRON | `TRON` | USDT (TRC20), USDC |
+| Ethereum | `ETH` | USDT (ERC20), USDC, DAI |
+| BNB Chain | `BSC` | USDT (BEP20), USDC, BUSD |
+| Polygon | `POLYGON` | USDT, USDC, DAI |
+| Avalanche | `AVAX_C_CHAIN` | USDT, USDC |
+| SUI | `SUI` | USDC |
+
+<Tip>
+  During development, use testnet chains (e.g., `TRON_TEST` for Shasta, `ETH_SEPOLIA` for Sepolia) to avoid real gas costs. See the [Testing guide](/guides/testing) for details.
+</Tip>

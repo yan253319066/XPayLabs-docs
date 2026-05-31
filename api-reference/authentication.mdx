@@ -1,123 +1,134 @@
 ---
-title: "Authenticating Your Requests to the XPayLabs REST API"
+title: "HMAC-SHA256 Request Signing — XPayLabs API Authentication"
 sidebarTitle: "Authentication"
-description: "Authenticate with the XPayLabs API using Bearer tokens. Understand test vs. live key types, restricted scopes, 401/403 errors, and security best practices."
+description: "Complete reference for computing HMAC-SHA256 signatures to authenticate XPayLabs API requests, including the signing algorithm and per-request fields."
 ---
 
-Every request you make to the XPayLabs API must include a valid API key in the `Authorization` header. XPayLabs uses Bearer token authentication — no cookies, no sessions, no OAuth flow required for server-to-server integrations. Your API key both identifies your account and determines which environment (test or live) and which resources the request can access.
+Every API request to XPayLabs must include a cryptographic signature. This page details the exact signing algorithm, the purpose of each field, and common pitfalls.
 
-## API Key Types
+## Signing Algorithm
 
-XPayLabs issues two categories of secret key, distinguished by their prefix:
+The `sign` field is computed as:
 
-| Key prefix | Environment | Description |
+```
+sign = HEX(HMAC-SHA256(JSON.stringify(data), merchant_token))
+```
+
+Where:
+- `data` is the request body payload (the `data` field of `ReqPayload`)
+- `merchant_token` is your configured secret token
+- `HMAC-SHA256` produces a binary digest
+- `HEX` converts it to a lowercase hexadecimal string (64 characters)
+
+## Important: JSON Serialization
+
+The `data` object must be serialized to JSON **with no extra whitespace**. Different JSON libraries may produce different output:
+
+| Library | Output | Valid? |
 |---|---|---|
-| `sk_test_…` | Test | Safe for development and CI. No real money moves. All operations are simulated. |
-| `sk_live_…` | Live | Real transactions. Charges are processed against actual payment methods. Keep these secret. |
+| `JSON.stringify(obj)` | `{"amount":"100.00","symbol":"USDT","chain":"TRON"}` | ✅ Yes |
+| `json.dumps(obj, separators=(",",":"))` | `{"amount":"100.00","symbol":"USDT","chain":"TRON"}` | ✅ Yes |
+| `json.dumps(obj, indent=2)` | Formatted with spaces/newlines | ❌ No |
 
 <Warning>
-  Secret keys (`sk_live_…` and `sk_test_…`) must **never** be exposed in client-side code, embedded in mobile apps, or committed to version control. Anyone who obtains your live secret key can initiate real charges on your account.
+  The signature is computed over the `data` field only — not over the full `ReqPayload` envelope. The `sign`, `timestamp`, and `nonce` fields are excluded from signing.
 </Warning>
 
-## Header Format
+## Request Envelope
 
-Pass your API key as a Bearer token in the `Authorization` header on every request:
-
-```bash
-Authorization: Bearer sk_test_abc123xyz
-```
-
-A complete example using cURL:
-
-```bash
-curl https://api.xpaylabs.com/v1/payments \
-  -H "Authorization: Bearer sk_test_abc123xyz" \
-  -H "Content-Type: application/json"
-```
-
-The API key goes directly after the `Bearer` keyword, separated by a single space. There is no additional encoding or signing required.
-
-## Where to Find Your Keys
-
-You can view, create, and revoke API keys in the XPayLabs Dashboard:
-
-1. Log in to [dashboard.xpaylabs.com](https://dashboard.xpaylabs.com).
-2. Navigate to **Developers → API Keys**.
-3. Copy your test or live secret key.
-
-The full key value is shown only once at creation time. If you lose a key, you must rotate it and replace all usages with the new key.
-
-## Scopes and Restricted Keys
-
-By default, a secret key grants full access to all resources and methods in its environment. For production integrations — especially those involving third-party services or automated pipelines — you should use **restricted keys** that limit access to only the resources and HTTP methods your integration actually needs.
-
-To create a restricted key:
-
-1. Go to **Dashboard → Developers → API Keys → Create restricted key**.
-2. Select the resource types (e.g., Payments, Refunds, Customers) and the allowed methods (read, write) for each.
-3. Copy and store the resulting key securely.
-
-Restricted keys carry the same `sk_live_…` or `sk_test_…` prefix but have a narrower permission surface. Requests that exceed the key's permitted scope return a `403` error (see [Error Responses](#error-responses) below).
-
-## Error Responses
-
-### 401 — Missing or Invalid Key
-
-The API returns `401 Unauthorized` when no API key is provided, when the key is malformed, or when the key has been revoked.
+Each request must include these four fields as a JSON object:
 
 ```json
 {
-  "error": {
-    "type": "authentication_error",
-    "code": "invalid_api_key",
-    "message": "The API key provided is invalid or has been revoked. Check your key in the Dashboard and update your integration."
+  "sign": "a1b2c3d4e5f6...",
+  "timestamp": 1717000000,
+  "nonce": "550e8400-e29b-41d4-a716-446655440000",
+  "data": {
+    "amount": "100.00",
+    "symbol": "USDT",
+    "chain": "TRON"
   }
 }
 ```
 
-Common causes:
-- Forgetting to include the `Authorization` header entirely
-- Passing a publishable key where a secret key is required
-- Using a key that was rotated or deleted
+## Language Examples
 
-### 403 — Insufficient Scope
+### Node.js
 
-The API returns `403 Forbidden` when the key is valid but the operation falls outside the key's permitted scopes.
+```javascript
+import crypto from "crypto";
 
-```json
-{
-  "error": {
-    "type": "permission_error",
-    "code": "insufficient_scope",
-    "message": "This API key does not have permission to perform write operations on the Refunds resource. Update the key's scopes in the Dashboard."
-  }
+function signRequest(data, token) {
+  return crypto
+    .createHmac("sha256", token)
+    .update(JSON.stringify(data), "utf8")
+    .digest("hex");
 }
 ```
 
-To resolve a `403`, either broaden the scopes on the restricted key in the Dashboard, or use a different key that has the required permissions.
+### Python
 
-## Security Best Practices
+```python
+import hmac, hashlib, json
 
-Following these practices protects your account and your users:
+def sign_request(data: dict, token: str) -> str:
+    json_str = json.dumps(data, separators=(",", ":"), sort_keys=True)
+    return hmac.new(token.encode(), json_str.encode(), hashlib.sha256).hexdigest()
+```
 
-- **Use environment variables.** Store API keys in environment variables (e.g., `XPAYLABS_SECRET_KEY`) rather than hard-coding them in your source files.
+### Java
 
-  ```bash
-  export XPAYLABS_SECRET_KEY=sk_live_abc123xyz
-  ```
+```java
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import java.security.MessageDigest;
 
-  ```javascript
-  const client = new XPayLabs(process.env.XPAYLABS_SECRET_KEY);
-  ```
+public static String signRequest(String dataJson, String token) throws Exception {
+    Mac mac = Mac.getInstance("HmacSHA256");
+    mac.init(new SecretKeySpec(token.getBytes("UTF-8"), "HmacSHA256"));
+    byte[] digest = mac.doFinal(dataJson.getBytes("UTF-8"));
+    return bytesToHex(digest);
+}
+```
 
-- **Use restricted keys in production.** Grant each service or integration only the permissions it needs. A webhook processor that only reads payment data should not have write access to refunds.
+### Go
 
-- **Rotate keys immediately if compromised.** If you suspect a key has been exposed — for example, it was accidentally pushed to a public repository — go to **Dashboard → API Keys**, revoke the key immediately, and issue a new one. Update all services using the old key before the revocation propagates.
+```go
+import (
+    "crypto/hmac"
+    "crypto/sha256"
+    "encoding/hex"
+    "encoding/json"
+)
 
-- **Never use secret keys in browser JavaScript.** Any code that runs in a user's browser is visible to that user. Use XPayLabs's publishable keys (`pk_test_…`, `pk_live_…`) for client-side operations and keep secret keys exclusively on your server.
+func SignRequest(data interface{}, token string) string {
+    jsonBytes, _ := json.Marshal(data)  // compact JSON
+    mac := hmac.New(sha256.New, []byte(token))
+    mac.Write(jsonBytes)
+    return hex.EncodeToString(mac.Sum(nil))
+}
+```
 
-- **Audit key usage.** Review the request logs in **Dashboard → Developers → Logs** regularly. Unexpected spikes or requests from unfamiliar IP addresses can indicate a compromised key.
+## Verification
 
-<Tip>
-  In CI/CD pipelines, inject API keys through your secrets manager (e.g., GitHub Actions Secrets, AWS Secrets Manager, HashiCorp Vault) rather than storing them in pipeline configuration files.
-</Tip>
+XPayLabs verifies each request by:
+1. Recomputing the HMAC-SHA256 signature from the `data` field and your stored merchant token.
+2. Checking that the computed signature matches the provided `sign` value.
+3. Validating that the `timestamp` is within 5 minutes of the server clock.
+4. Ensuring the `nonce` has not been used before.
+
+If any check fails, the gateway returns a `401 Unauthorized` response:
+```json
+{
+  "code": 401,
+  "msg": "Sign verification failed",
+  "data": null
+}
+```
+
+## GET Request Signing
+
+For `GET` requests that require authentication (e.g., `/v1/order/status/{orderId}`, `/v1/order/pay`, `/v1/order/getOrderStatus`), the `sign` parameter is passed as a query string value. The signature is computed over the relevant parameters (typically `orderId`):
+```
+sign = HEX(HMAC-SHA256(orderId, merchant_token))
+```

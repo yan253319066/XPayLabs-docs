@@ -1,0 +1,100 @@
+---
+title: "XPayLabs API Error Codes and How to Handle Them"
+sidebarTitle: "Errors"
+description: "XPayLabs returns structured error responses with HTTP-compatible status codes. Learn the error format, common codes, and how to handle failures."
+---
+
+XPayLabs returns errors using a consistent envelope with an HTTP-compatible `code` field and a human-readable `msg` field.
+
+## Error Response Format
+
+```json
+{
+  "code": 400,
+  "msg": "The amount cannot be left blank.",
+  "data": null
+}
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `code` | integer | HTTP-compatible status code |
+| `msg` | string | Human-readable error description |
+| `data` | null | Always `null` for error responses |
+
+## HTTP Status Codes
+
+| Code | Meaning | Typical Cause |
+|---|---|---|
+| `400` | Bad Request | Missing or invalid request parameters |
+| `401` | Unauthorized | Invalid HMAC signature or expired timestamp |
+| `422` | Unprocessable Entity | Business logic error (e.g., invalid address for chain) |
+| `429` | Too Many Requests | Rate limit exceeded |
+| `500` | Internal Server Error | Unexpected server error |
+
+## Common Error Codes
+
+### Sign Verification Errors (`401`)
+
+| Message | Cause |
+|---|---|
+| `"Sign verification failed"` | The HMAC signature does not match the computed value |
+| `"The sign cannot be left blank."` | The `sign` field is missing |
+| `"The timestamp cannot be left blank."` | The `timestamp` field is missing |
+| `"The nonce cannot be left blank."` | The `nonce` field is missing |
+
+### Validation Errors (`400`)
+
+| Message | Cause |
+|---|---|
+| `"The amount cannot be left blank."` | Amount is missing or null |
+| `"The symbol cannot be left blank."` | Symbol is missing or empty |
+| `"The chain cannot be left blank."` | Chain is missing or invalid |
+| `"The receiveAddress cannot be left blank."` | Payout address is missing |
+| `"ReceiveAddress error"` | The payout address is invalid for the specified chain |
+| `"The orderId cannot be left blank."` | orderId is required for this merchant version |
+| `"The uid cannot be left blank."` | uid is required for this merchant version |
+| `"The uid cannot be zero."` | uid cannot be the string "0" |
+
+### Rate Limit Errors (`429`)
+
+```json
+{
+  "code": 429,
+  "msg": "Too many requests. Please slow down.",
+  "data": null
+}
+```
+
+## Handling Errors
+
+```javascript
+async function createCollection(payload) {
+  const response = await fetch("http://your-gateway:3010/v1/order/createCollection", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  const result = await response.json();
+
+  if (result.code !== 200) {
+    console.error(`Request failed: ${result.msg}`);
+    // Handle specific error codes:
+    switch (result.code) {
+      case 401:
+        // Recompute signature and retry
+        break;
+      case 400:
+        // Fix request parameters
+        break;
+      case 429:
+        // Back off and retry
+        break;
+    }
+    return null;
+  }
+
+  return result.data;
+}
+```

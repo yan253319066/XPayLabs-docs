@@ -1,293 +1,157 @@
 ---
-title: "Troubleshoot XPayLabs Integration and Payment Errors"
+title: "Troubleshoot XPayLabs Gateway and Integration Issues"
 sidebarTitle: "Troubleshooting"
-description: "Diagnose and resolve common issues with XPayLabs integrations, including authentication errors, payment failures, and webhook problems."
+description: "Diagnose and resolve common issues with XPayLabs — including signature errors, connection problems, scanner issues, and webhook failures."
 ---
 
-This guide helps you diagnose and resolve the most common problems you may encounter when integrating XPayLabs. Work through the relevant section for your issue, follow the step-by-step checks, and refer to the code examples to verify your implementation. If you exhaust the steps here and the problem persists, see the note at the bottom of this page for how to reach the support team.
+This guide helps you diagnose and resolve common problems with your XPayLabs gateway deployment and API integration.
 
 ---
 
-## Authentication Issues
+## API Issues
 
-Authentication errors are almost always caused by a missing, malformed, or mismatched API key. Check the points below before assuming an infrastructure problem.
+### 401 — Sign Verification Failed
 
-### 401 Unauthorized
+The HMAC-SHA256 signature does not match what the gateway computed.
 
-A `401` response means the API could not authenticate your request. The most common causes are:
+**Checklist:**
 
-- **No `Authorization` header:** every request to `https://api.xpaylabs.com/v1` must include the header.
-- **Incorrect format:** the header value must be `Bearer ` followed immediately by your secret key — no extra spaces, quotes, or newline characters.
-- **Revoked or deleted key:** confirm that the key still exists in **Dashboard → Developers → API Keys**.
+1. **JSON serialization** — Ensure the `data` object is serialized as **compact JSON** (no spaces, no newlines). `JSON.stringify(obj)` in JavaScript produces the correct format by default.
 
-Make sure your request header looks exactly like this:
+2. **Data content** — The `sign` is computed over only the `data` field, not the full request envelope. The `sign`, `timestamp`, and `nonce` fields are excluded.
 
-```bash
-Authorization: Bearer sk_test_YOUR_KEY
+3. **Token mismatch** — Confirm the `MERCHANT_TOKEN` used to compute the signature matches the token configured in the gateway.
+
+4. **Character encoding** — Ensure the token and JSON string are UTF-8 encoded.
+
+5. **Test your signature** — Compute the signature for a known payload and compare:
+
+```javascript
+const crypto = require("crypto");
+const token = "your-merchant-token";
+const data = { amount: "100.00", symbol: "USDT", chain: "TRON" };
+const sign = crypto
+  .createHmac("sha256", token)
+  .update(JSON.stringify(data), "utf8")
+  .digest("hex");
+console.log(sign); // Should match what gateway expects
 ```
 
-A minimal authenticated request looks like:
+### 400 — Validation Errors
 
-```bash
-curl -X GET https://api.xpaylabs.com/v1/payment_intents \
-  -H "Authorization: Bearer sk_test_YOUR_KEY"
-```
-
-<Warning>
-  Never include your secret key in client-side JavaScript or mobile app source code. Use your **publishable key** (`pk_test_` / `pk_live_`) on the frontend and keep your secret key exclusively on your server.
-</Warning>
-
-### Using a Test Key in Live Mode (or Vice Versa)
-
-XPayLabs enforces a strict separation between test and live environments. Using a test key against live resources — or a live key while running integration tests — results in a `401` or `403` error.
-
-Check the prefix of the key you are using:
-
-| Prefix | Environment |
+| Message | Likely Cause |
 |---|---|
-| `sk_test_` | Test mode (sandbox) |
-| `sk_live_` | Live mode (production) |
-| `pk_test_` | Test mode (client-side) |
-| `pk_live_` | Live mode (client-side) |
-
-Confirm which environment your Dashboard is currently viewing by checking the **Test Mode** toggle in the top navigation bar. Your API keys, payment records, and webhook endpoints are scoped to either test or live — they do not cross over.
+| `"The amount cannot be left blank."` | `amount` is `null`, `undefined`, or not a valid number |
+| `"The symbol cannot be left blank."` | `symbol` is missing or an empty string |
+| `"The chain cannot be left blank."` | `chain` is missing or not a valid chain value |
+| `"ReceiveAddress error"` | The payout address format does not match the specified chain |
+| `"The uid cannot be left blank."` | Your merchant account is V2 and requires `uid` |
+| `"The orderId cannot be left blank."` | Your merchant account is V3 and requires `orderId` |
 
 ---
 
-## Payment Failures
+## Blockchain Scanner Issues
 
-When a payment fails, the XPayLabs API always returns a structured error object. Read the `error.code` field to identify the exact cause and surface a clear message to your customer.
+### Payments Not Detected
 
-### `card_declined`
+If the scanner is not detecting incoming payments:
 
-The card issuer rejected the charge. This is a customer-side issue — your integration has no way to override it. Ask the customer to try a different card or contact their bank.
+1. **Check scanner logs:** `docker logs <scanner-container-name>`
+2. **Verify RPC endpoints:** Ensure the configured RPC URL is accessible from the gateway server.
+3. **Check block height:** The scanner syncs from the last processed block. If the gateway was recently deployed, it may need time to catch up.
+4. **Confirm token configuration:** Verify the token contract address is correctly configured for the chain.
+5. **Check blockchain explorer:** Confirm the transaction actually exists on-chain at the expected address.
 
-```json
-{
-  "error": {
-    "type": "card_error",
-    "code": "card_declined",
-    "message": "Your card was declined.",
-    "payment_intent": "pi_abc123"
-  }
-}
-```
+### Scanner is Slow
 
-In your checkout UI, display a friendly message such as _"Your card was declined. Please try a different payment method."_ Do not surface the raw API message.
-
-### `insufficient_funds`
-
-The customer's account does not have enough balance to cover the charge. This is also a customer-side issue. Prompt the customer to use a different card or payment method.
-
-```json
-{
-  "error": {
-    "type": "card_error",
-    "code": "insufficient_funds",
-    "message": "Your card has insufficient funds.",
-    "payment_intent": "pi_abc123"
-  }
-}
-```
-
-### `invalid_request_error`
-
-This error indicates a problem with the data your server sent to the API — it is an integration bug, not a customer-side issue. Check the `message` field for details.
-
-```json
-{
-  "error": {
-    "type": "invalid_request_error",
-    "code": "parameter_invalid",
-    "message": "amount must be greater than 0",
-    "param": "amount"
-  }
-}
-```
-
-Common causes of `invalid_request_error`:
-
-- **`amount` is zero or negative:** the `amount` field must be a positive integer greater than `0`.
-- **`currency` is not a valid ISO 4217 code:** use lowercase three-letter codes such as `usd`, `eur`, or `gbp`.
-- **Missing required fields:** `amount`, `currency`, and `payment_method` are all required to create a payment intent.
-
-### Amount in Wrong Units
-
-<Warning>
-  All amounts in the XPayLabs API are expressed in the **smallest currency unit**. For currencies with two decimal places (USD, EUR, GBP), this means **cents** — not dollars. A charge of **$25.00** must be sent as `"amount": 2500`.
-</Warning>
-
-```json
-{
-  "amount": 2500,
-  "currency": "usd",
-  "payment_method": "pm_card_visa"
-}
-```
-
-Zero-decimal currencies (such as JPY) are an exception — for these, pass the face value directly (e.g., ¥500 → `"amount": 500`). See the [Currencies reference](https://xpaylabs.com/docs/currencies) for a full list.
+- **RPC rate limits:** Public RPC endpoints may throttle high-frequency requests. Consider using dedicated RPC endpoints.
+- **Block time:** Different chains have different block times. TRON produces blocks every 3 seconds, Ethereum every 12 seconds.
+- **Confirmation requirements:** Configure the required number of block confirmations per chain in the gateway settings.
 
 ---
 
 ## Webhook Problems
 
-Webhooks are the primary mechanism XPayLabs uses to push real-time event notifications to your server. The most common issues are misconfigured endpoints, incorrect signature verification, and unhandled duplicate events.
-
 ### Not Receiving Webhooks
 
-If your endpoint is not receiving events, work through the following checks:
-
-1. **Endpoint URL is publicly accessible:** XPayLabs cannot deliver webhooks to `localhost` or private network addresses. During local development, use a tunnelling tool such as [ngrok](https://ngrok.com) to expose your local server.
-2. **Endpoint responds with HTTP 2xx:** XPayLabs considers a delivery successful only when your endpoint returns a `200`–`299` status code within **30 seconds**. Any other response or a timeout is treated as a failed delivery.
-3. **Check the Dashboard delivery log:** go to **Dashboard → Developers → Webhooks**, select your endpoint, and inspect the **Recent Deliveries** tab. Failed deliveries show the HTTP status code and response body your server returned.
-
-<Tip>
-  Use the **Send test event** button in the Dashboard to trigger a sample event to your endpoint and verify end-to-end delivery without needing to create a real payment.
-</Tip>
+1. **Verify callback URL:** Check the `callback-url` in your gateway configuration.
+2. **Network accessibility:** The gateway must be able to reach your callback URL. If testing locally, use a tunneling tool like ngrok.
+3. **Check gateway logs:** `docker logs <core-container-name>` to see webhook delivery attempts.
+4. **Check your endpoint logs:** Ensure your server is listening on the correct path and returning HTTP 200.
 
 ### Signature Verification Failing
 
-If your signature check is returning a mismatch, the most likely causes are:
-
-- **Parsing the body before verification:** you must compute the HMAC over the **raw request bytes**, not the parsed JSON object. Parsing changes whitespace and key ordering.
-- **Wrong webhook secret:** each endpoint has its own secret. Confirm you are reading the secret for the specific endpoint receiving the event, not a secret from a different endpoint.
-- **Encoding mismatch:** ensure your HMAC is computed with UTF-8 encoded bytes and compared as a lowercase hex string.
-
-```python
-import hmac
-import hashlib
-from flask import Flask, request, abort
-
-app = Flask(__name__)
-WEBHOOK_SECRET = "whsec_YOUR_ENDPOINT_SECRET"
-
-@app.route("/webhook", methods=["POST"])
-def handle_webhook():
-    raw_body = request.get_data()  # raw bytes — do NOT call request.json here
-    signature = request.headers.get("X-XPayLabs-Signature", "")
-
-    expected = hmac.new(
-        WEBHOOK_SECRET.encode("utf-8"),
-        raw_body,
-        hashlib.sha256
-    ).hexdigest()
-
-    if not hmac.compare_digest(expected, signature):
-        abort(400, "Invalid signature")
-
-    event = request.get_json()
-    # process event...
-    return "", 200
-```
-
-### Receiving Duplicate Events
-
-XPayLabs delivers each event **at least once**, which means your endpoint may occasionally receive the same event more than once — for example, if your server times out before returning a `200` response.
-
-Protect against duplicate processing by storing each event's `id` and skipping events you have already handled:
-
-```python
-processed_event_ids = set()  # use a persistent store (database) in production
-
-@app.route("/webhook", methods=["POST"])
-def handle_webhook():
-    # ... signature verification above ...
-    event = request.get_json()
-    event_id = event["id"]
-
-    if event_id in processed_event_ids:
-        return "", 200  # already handled — acknowledge and skip
-
-    processed_event_ids.add(event_id)
-    # process event...
-    return "", 200
-```
-
-### Inspecting Webhook Delivery Logs
-
-The Dashboard provides a full delivery history for every webhook endpoint:
-
-1. Go to **Dashboard → Developers → Webhooks**.
-2. Click the endpoint URL you want to inspect.
-3. Open the **Recent Deliveries** tab to see every attempted delivery, including the HTTP status your server returned, the request headers XPayLabs sent, and the response body.
-4. Click **Retry** next to any failed delivery to resend it immediately.
+1. **Raw data vs. full payload:** Verify the signature over the `data` field only, not the full `NotifyPayload`.
+2. **Webhook secret mismatch:** Confirm the `webhook-secret` used for verification matches what is configured in the gateway.
+3. **JSON format:** The `data` field must be serialized as compact JSON for verification.
 
 ---
 
-## Settlement Delays
+## Deployment Issues
 
-Most settlement delays have a straightforward cause. Check the following before contacting support.
-
-### Account Not Fully Verified
-
-Payouts are blocked until your identity and bank account verification are complete. Go to **Settings → Verification** in the Dashboard to see any outstanding requirements. If a document upload is marked as rejected, re-upload a clearer image and allow 1–2 business days for re-review.
-
-### Public Holiday Buffer
-
-The default T+2 settlement schedule counts **business days only** — weekends and public holidays in your country of operation do not count. A payment captured on the Thursday before a long weekend may not settle until the following week. Review the [Public Holiday Calendar](https://xpaylabs.com/docs/holidays) in the documentation for your country.
-
-### Suspicious Activity Review
-
-If our risk systems detect unusual patterns — such as a sudden spike in transaction volume or an elevated refund rate — your payouts may be paused pending a review. You will receive an email explaining the hold. Respond promptly to any requests for information to minimise the delay. If you believe the hold was applied in error, contact [support@xpaylabs.com](mailto:support@xpaylabs.com) with your account ID and a description of your recent activity.
-
-<Warning>
-  Do not create a second XPayLabs account to work around a payout hold. Doing so violates the Terms of Service and may result in permanent account termination.
-</Warning>
-
----
-
-## Rate Limits
-
-XPayLabs enforces rate limits to ensure fair access and platform stability for all users.
-
-### 429 Too Many Requests
-
-The default rate limit is **100 requests per second per API key**. When you exceed this limit, the API returns a `429` status code. Implement **exponential backoff with jitter** to retry requests gracefully:
-
-```python
-import time
-import random
-import requests
-
-def post_with_backoff(url: str, headers: dict, payload: dict, max_retries: int = 5):
-    for attempt in range(max_retries):
-        response = requests.post(url, headers=headers, json=payload)
-
-        if response.status_code != 429:
-            return response
-
-        # Exponential backoff: 1s, 2s, 4s, 8s, 16s — plus random jitter
-        wait_seconds = (2 ** attempt) + random.uniform(0, 1)
-        print(f"Rate limited. Retrying in {wait_seconds:.2f}s (attempt {attempt + 1}/{max_retries})")
-        time.sleep(wait_seconds)
-
-    raise RuntimeError("Max retries exceeded after repeated 429 responses")
-```
-
-### Reading Your Remaining Quota
-
-Every API response includes rate limit headers you can use to monitor your current usage before hitting the limit:
+### Docker Containers Not Starting
 
 ```bash
-X-RateLimit-Limit: 100
-X-RateLimit-Remaining: 43
-X-RateLimit-Reset: 1718123456
+# Check container status
+docker compose ps
+
+# View logs for a specific service
+docker compose logs core
+docker compose logs scanner-tron
 ```
 
-| Header | Description |
-|---|---|
-| `X-RateLimit-Limit` | Total requests allowed per second for your key |
-| `X-RateLimit-Remaining` | Requests remaining in the current one-second window |
-| `X-RateLimit-Reset` | Unix timestamp (UTC) when the current window resets |
+Common causes:
+- Port `3010` already in use
+- Insufficient disk space
+- Missing environment variables in configuration
 
-If `X-RateLimit-Remaining` drops near zero, throttle your requests proactively rather than waiting for a `429`.
+### Gateway Not Responding
 
-### Increasing Your Rate Limit
-
-If your integration consistently hits the default limit and exponential backoff is not sufficient, contact [support@xpaylabs.com](mailto:support@xpaylabs.com) to request a higher limit for your account. Include your account ID and a description of your expected request pattern.
+1. **Verify container is running:** `docker compose ps` should show `Up` status.
+2. **Check port binding:** `docker compose port core 3010`
+3. **Test locally:** `curl http://localhost:3010/v1/symbol/supportSymbols`
+4. **Check firewall:** Ensure port 3010 is open in your server firewall.
 
 ---
 
-<Note>
-  If your issue is not covered in this guide, contact the XPayLabs support team at [support@xpaylabs.com](mailto:support@xpaylabs.com) or open a ticket directly from the **Help → Support** section of your Dashboard. Include your account ID, the relevant API request and response bodies (with your secret key redacted), and a description of the steps you have already tried.
-</Note>
+## Rate Limiting
+
+If you receive `429 Too Many Requests`:
+
+| Endpoint | Default Limit |
+|---|---|
+| `POST /order/createCollection` | 100 req / 10s per IP |
+| `POST /order/createPayout` | 100 req / 10s per IP |
+| `GET /order/pay` | 2 req / 1s per orderId |
+| `GET /order/getOrderStatus` | 2 req / 1s per orderId |
+
+Implement exponential backoff in your integration:
+
+```javascript
+async function fetchWithRetry(url, options, retries = 5) {
+  for (let i = 0; i < retries; i++) {
+    const response = await fetch(url, options);
+    if (response.status !== 429) return response;
+    const delay = Math.pow(2, i) * 1000 + Math.random() * 1000;
+    await new Promise(r => setTimeout(r, delay));
+  }
+  throw new Error("Max retries exceeded");
+}
+```
+
+---
+
+## Getting Help
+
+If you cannot resolve your issue:
+
+1. Check the container logs for error messages.
+2. Review the [FAQ](/faq) for common questions.
+3. Open a GitHub issue at [github.com/xpaylabs/gateway](https://github.com/xpaylabs/gateway).
+4. For commercial support, contact support@xpaylabs.com.
+
+When reporting an issue, include:
+- Gateway version and deployment method
+- Relevant configuration (redact secrets)
+- Complete error messages and logs
+- Steps to reproduce

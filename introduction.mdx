@@ -1,62 +1,66 @@
 ---
-title: "XPayLabs: Global Payment Infrastructure for Developers"
+title: "XPayLabs: Self-Hosted Crypto Payment Infrastructure"
 sidebarTitle: "Introduction"
-description: "XPayLabs gives you a single API to accept, process, and manage payments worldwide. Start collecting payments in minutes with developer-friendly tools."
+description: "XPayLabs is a self-hosted, non-custodial crypto payment infrastructure. Deploy on your own servers to accept stablecoin payments across TRON, EVM chains, and SUI with zero gateway fees."
 ---
 
-XPayLabs is a payment infrastructure platform that lets you accept and manage payments globally through a single, unified API. Whether you're processing your first transaction or scaling to millions, XPayLabs provides the reliability, security, and developer experience you need to build great payment experiences.
+XPayLabs is a self-hosted crypto payment infrastructure that lets you accept and manage stablecoin payments across multiple blockchains through a single API. Unlike hosted payment gateways, XPayLabs runs entirely on your infrastructure — your private keys stay on your servers, your funds go directly to your wallets, and you pay zero gateway fees.
 
 <CardGroup cols={2}>
   <Card title="Quick Start" icon="rocket" href="/quickstart">
-    Go from zero to your first payment in under 10 minutes
+    Deploy your payment gateway and create your first collection in minutes
   </Card>
   <Card title="Authentication" icon="key" href="/authentication">
-    Get your API keys and authenticate your requests
+    Generate API tokens and sign your requests securely
   </Card>
   <Card title="API Reference" icon="code" href="/api-reference/overview">
     Explore every endpoint, parameter, and response field
   </Card>
   <Card title="Guides" icon="book-open" href="/guides/accept-payments">
-    Step-by-step walkthroughs for common payment flows
+    Step-by-step walkthroughs for collection and payout flows
   </Card>
 </CardGroup>
 
-## What you can build
+## Supported Blockchains
 
-XPayLabs provides the building blocks for a wide range of payment use cases:
+XPayLabs natively supports the following blockchain networks:
 
-- **E-commerce checkouts** — Accept cards, digital wallets, and local payment methods
-- **Marketplace payouts** — Send funds to sellers, vendors, and contractors globally
-- **Subscription billing** — Charge customers on a recurring schedule
-- **In-person payments** — Process face-to-face transactions with our Terminal SDK
+| Chain | Type | Stablecoins |
+|---|---|---|
+| **TRON** | TRC20 | USDT, USDC |
+| **Ethereum** | ERC20 | USDT, USDC, DAI |
+| **BNB Chain** | BEP20 | USDT, USDC, BUSD |
+| **Polygon** | ERC20 | USDT, USDC, DAI |
+| **Avalanche C-Chain** | ERC20 | USDT, USDC |
+| **SUI** | Native | USDC |
 
-## How it works
+## How It Works
 
 <Steps>
-  <Step title="Create an account">
-    Sign up at [dashboard.xpaylabs.com](https://dashboard.xpaylabs.com) and complete identity verification to unlock live payments.
+  <Step title="Deploy the gateway">
+    Run `docker compose up -d` on your server. The XPayLabs core container starts all services — API server, blockchain scanners, webhook dispatcher, and the checkout UI.
   </Step>
-  <Step title="Get your API keys">
-    From the Dashboard, navigate to **Developers → API Keys** to copy your secret key. Use your test key during development — no real money moves.
+  <Step title="Generate API credentials">
+    Configure your merchant token in the gateway dashboard. This token is used to sign every API request with HMAC-SHA256.
   </Step>
-  <Step title="Create a payment">
-    Send a `POST /payments` request with the amount, currency, and payment method. XPayLabs handles authorization, capture, and settlement.
+  <Step title="Create a collection">
+    Send a `POST /v1/order/createCollection` request with amount, symbol, and chain. XPayLabs returns a unique deposit address and checkout URL.
   </Step>
-  <Step title="Listen for events">
-    Register a webhook endpoint to receive real-time notifications when payments succeed, fail, or are refunded.
+  <Step title="Listen for webhooks">
+    Register your callback URL. When the blockchain scanner detects the incoming transaction, XPayLabs delivers a signed webhook notification.
   </Step>
 </Steps>
 
-## Key concepts
+## Key Concepts
 
 | Concept | Description |
 |---|---|
-| **Payment** | A single charge against a payment method |
-| **Settlement** | The transfer of funds from XPayLabs to your bank account |
-| **Refund** | A full or partial return of a captured payment |
-| **Payout** | A funds transfer from your XPayLabs balance to a third party |
-| **Webhook** | An HTTP callback triggered by a payment event |
+| **Collection** | A request for payment that generates a unique deposit address |
+| **Payout** | A funds transfer from your gateway wallet to an external address |
+| **Settlement** | Automatic sweep of received funds from hot wallets to your cold storage |
+| **Webhook** | An HTTP callback triggered by order or collection status changes |
+| **Scanner** | A blockchain indexer that monitors incoming transactions in real-time |
 
 <Tip>
-  Use your **test API key** during development. Test mode is completely isolated from live transactions — you can create payments, trigger failures, and test webhooks without any real money moving.
+  Since XPayLabs is self-hosted, you have complete control over your funds. No third party holds your private keys, and no gateway fees are deducted from your transactions — you only pay blockchain network gas fees.
 </Tip>

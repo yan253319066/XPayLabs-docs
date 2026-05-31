@@ -1,0 +1,133 @@
+---
+title: "Create a Payout Order | POST /v1/order/createPayout"
+sidebarTitle: "Create Payout"
+description: "Initiate a payout from your gateway wallet to an external blockchain address. Requires a valid receive address for the specified chain."
+---
+
+Creates a new payout order, sending funds from your gateway-managed wallet to an external blockchain address. The gateway validates the receive address format for the specified chain before processing.
+
+## Request
+
+**`POST http://your-gateway:3010/v1/order/createPayout`**
+
+### Headers
+
+| Header | Value |
+|---|---|
+| `Content-Type` | `application/json` |
+
+### Body Parameters (`data` field)
+
+<ParamField body="amount" type="string" required>
+  The payout amount as a decimal string, e.g. `"50.00"`. Must be greater than zero.
+</ParamField>
+
+<ParamField body="symbol" type="string" required>
+  The token symbol to send, e.g. `"USDT"`. Must be a supported symbol on the specified chain.
+</ParamField>
+
+<ParamField body="chain" type="string" required>
+  The blockchain network for the payout. Must match the network of the receive address:
+  - `TRON` — TRC20
+  - `ETH` — ERC20
+  - `BSC` — BEP20
+  - `POLYGON` — Polygon
+  - `AVAX_C_CHAIN` — Avalanche
+  - `SUI` — SUI Network
+</ParamField>
+
+<ParamField body="receiveAddress" type="string" required>
+  The destination blockchain address. The gateway validates the address format for the specified chain. Example: `"TWkKZkmuB8DpVeiMoHiKf99ZoFHzk73CqR"` (TRON) or `"0x..."` (EVM).
+</ParamField>
+
+<ParamField body="orderId" type="string" optional>
+  Your unique order identifier. Required for V3 merchants.
+</ParamField>
+
+<ParamField body="uid" type="string" optional>
+  Your internal user identifier. Required for V2 merchants. Cannot be `"0"`.
+</ParamField>
+
+### cURL
+
+```bash
+curl -X POST http://your-gateway:3010/v1/order/createPayout \
+  -H "Content-Type: application/json" \
+  -d '{
+    "sign": "a1b2c3d4e5f6...",
+    "timestamp": 1717000000,
+    "nonce": "550e8400-e29b-41d4-a716-446655440000",
+    "data": {
+      "amount": "50.00",
+      "symbol": "USDT",
+      "chain": "TRON",
+      "receiveAddress": "TWkKZkmuB8DpVeiMoHiKf99ZoFHzk73CqR",
+      "orderId": "payout_001"
+    }
+  }'
+```
+
+---
+
+## Response
+
+A successful request returns HTTP `200` with the `R<PaymentAddress>` envelope.
+
+### PaymentAddress Object
+
+<ResponseField name="address" type="string">
+  The source address the payout will be sent from. Example: `"TWkKZkmuB8DpVeiMoHiKf99ZoFHzk73CqR"`.
+</ResponseField>
+
+<ResponseField name="amount" type="string">
+  The payout amount. Matches the request amount.
+</ResponseField>
+
+<ResponseField name="symbol" type="string">
+  The token symbol. Example: `"USDT"`.
+</ResponseField>
+
+<ResponseField name="chain" type="string">
+  The blockchain network. Example: `"TRON"`.
+</ResponseField>
+
+<ResponseField name="orderId" type="string">
+  Your order identifier, echoed back from the request.
+</ResponseField>
+
+<ResponseField name="expiredTime" type="integer">
+  Unix timestamp when this payout request expires.
+</ResponseField>
+
+### Example Response
+
+```json
+{
+  "code": 200,
+  "msg": "success",
+  "data": {
+    "address": "TWkKZkmuB8DpVeiMoHiKf99ZoFHzk73CqR",
+    "amount": "50.00",
+    "symbol": "USDT",
+    "chain": "TRON",
+    "orderId": "payout_001",
+    "expiredTime": 1717086400
+  }
+}
+```
+
+---
+
+## Error Responses
+
+| Code | Message | Cause |
+|---|---|---|
+| `400` | `"The receiveAddress cannot be left blank."` | `receiveAddress` is missing or empty |
+| `400` | `"ReceiveAddress error"` | The address format is invalid for the specified chain |
+| `400` | `"The amount cannot be left blank."` | `amount` is missing |
+| `400` | `"The symbol cannot be left blank."` | `symbol` is missing |
+| `400` | `"The chain cannot be left blank."` | `chain` is missing |
+
+<Warning>
+  Payouts move real funds from your gateway wallet. Always verify the receive address before submitting a payout request. Blockchain transactions cannot be reversed.
+</Warning>

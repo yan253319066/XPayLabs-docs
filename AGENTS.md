@@ -14,12 +14,16 @@
 
 ## Terminology
 
-{/* Add product-specific terms and preferred usage */}
-{/* Example: Use "workspace" not "project", "member" not "user" */}
+- Use **"collection"** not "payment" when referring to receiving funds (e.g., "create a collection order")
+- Use **"payout"** for sending funds to external addresses
+- Use **"order"** as the generic term — collections and payouts are both types of orders
+- Use **"merchant token"** not "API key" — authentication is HMAC-signed, not Bearer token
+- Use **"deposit address"** not "payment address" for the address where customers send funds
+- Use **"sweep"** or **"collection"** for hot-to-cold wallet settlement
+- Use **"webhook callback"** not "webhook endpoint" — merchants register a callback URL
+- Use **"scanner"** for the blockchain indexing component
 
 ## Style preferences
-
-{/* Add any project-specific style rules below */}
 
 - Use active voice and second person ("you")
 - Keep sentences concise — one idea per sentence
@@ -29,5 +33,7 @@
 
 ## Content boundaries
 
-{/* Define what should and shouldn't be documented */}
-{/* Example: Don't document internal admin features */}
+- Document the public REST API only (v1/order/*, v1/symbol/*)
+- Do not document internal admin features or dashboard UI details
+- Do not document the underlying Java/Spring Boot implementation
+- Focus on the merchant/integrator perspective — how to use the API, not how it works internally

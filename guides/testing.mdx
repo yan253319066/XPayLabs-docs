@@ -1,174 +1,123 @@
 ---
-title: "Test Payments and Edge Cases with XPayLabs Test Mode"
+title: "Test Your XPayLabs Integration with Testnet Networks"
 sidebarTitle: "Testing"
-description: "Simulate payments, declines, 3DS authentication flows, and payout failures in XPayLabs test mode using test cards and special account numbers."
+description: "Test your XPayLabs payment integration using blockchain testnets. Configure testnet endpoints, get faucet tokens, and verify the complete collection-to-webhook flow."
 ---
 
-Test mode is a completely isolated environment within XPayLabs — it runs in parallel with live mode but shares no data with it. When you use a `sk_test_...` API key, every API call, payment object, refund, and payout you create exists only in the test environment. No real money moves, no real bank accounts are charged, and test data never appears in your live Dashboard. This lets you build and verify your entire integration safely before going live.
+Test your XPayLabs integration using blockchain testnets before processing real mainnet transactions. Testnet networks simulate the real blockchain environment without using real funds.
 
-<Note>
-  Test mode and live mode are completely separate environments. A payment created with `sk_test_abc123` will never appear under your live Dashboard, and live payments are never visible in test mode. Always confirm which key your server is using before deploying to production.
-</Note>
+## Supported Testnets
 
-## Test API Keys
+| Testnet | Chain Value | Faucet |
+|---|---|---|
+| TRON Shasta | `TRON_TEST` | [TRON Shasta Faucet](https://shasta.tronscan.org/) |
+| Ethereum Sepolia | `ETH_SEPOLIA` | [Sepolia Faucet](https://sepoliafaucet.com/) |
+| BSC Testnet | `BSC_TEST` | [BSC Testnet Faucet](https://testnet.bnbchain.org/faucet-smart) |
+| Polygon Amoy | `POLYGON_AMOY` | [Polygon Faucet](https://faucet.polygon.technology/) |
+| Avalanche Fuji | `AVAX_FUJI_TEST` | [Avalanche Faucet](https://faucet.avax.network/) |
+| SUI Testnet | `SUI_TEST` | [SUI Faucet](https://faucet.sui.io/) |
 
-Use your `sk_test_...` secret key on your server and your `pk_test_...` publishable key in the browser. You can find both in the **Developers → API Keys** section of your XPayLabs Dashboard.
+## Configuration
 
-```bash
-# Test environment
-Authorization: Bearer sk_test_abc123
+Configure testnet RPC endpoints in your gateway configuration:
 
-# Live environment (use only in production)
-Authorization: Bearer sk_live_...
+```yaml
+xpay:
+  blockchain:
+    tron:
+      mainnet:
+        rpc-url: "https://api.trongrid.io"
+      testnet:
+        rpc-url: "https://api.shasta.trongrid.io"
+    ethereum:
+      sepolia:
+        rpc-url: "https://rpc.sepolia.org"
+    bsc:
+      testnet:
+        rpc-url: "https://data-seed-prebsc-1-s1.binance.org:8545"
 ```
 
-## Test Card Numbers
+## Testing the Full Flow
 
-Use the following card numbers to simulate specific payment outcomes in test mode. Pair any of them with a future expiry date (e.g., `12/34`) and any 3-digit CVC (e.g., `123`).
+### 1. Get Test Tokens
 
-| Card Number | Outcome |
-|---|---|
-| `4242 4242 4242 4242` | Payment succeeds |
-| `4000 0000 0000 0002` | Card declined (generic) |
-| `4000 0000 0000 9995` | Insufficient funds |
-| `4000 0000 0000 0069` | Expired card |
-| `4000 0000 0000 0127` | Incorrect CVC |
-| `4000 0027 6000 3184` | Requires 3D Secure authentication |
+Visit the faucet for your chosen testnet and request test USDT or native tokens (TRX, ETH, BNB). You'll need:
+- **Native gas tokens** (TRX, ETH, BNB) to pay blockchain fees
+- **Test USDT** to simulate customer payments
 
-For cards that require 3D Secure (`4000 0027 6000 3184`), your integration must handle the `requires_action` status and call `xpay.handleNextAction()` (or redirect to `next_action.redirect_to_url.url`). In test mode, the 3DS challenge page has **Authenticate** and **Fail Authentication** buttons so you can test both outcomes.
-
-<Info>
-  Use any future expiry date and any 3-digit CVC with the test cards above. For American Express test cards, use a 4-digit CVC. The billing postal code field, if shown, accepts any 5-digit value (e.g., `10001`).
-</Info>
-
-## Test Card Example
+### 2. Create a Test Collection
 
 ```bash
-curl -X POST https://api.xpaylabs.com/v1/payments \
-  -H "Authorization: Bearer sk_test_abc123" \
+curl -X POST http://your-gateway:3010/v1/order/createCollection \
   -H "Content-Type: application/json" \
   -d '{
-    "amount": 4999,
-    "currency": "usd",
-    "payment_method_token": "tok_visa_4242",
-    "description": "Test order"
+    "sign": "<computed_sign>",
+    "timestamp": 1717000000,
+    "nonce": "test_nonce_001",
+    "data": {
+      "amount": "10.00",
+      "symbol": "USDT",
+      "chain": "TRON_TEST",
+      "orderId": "test_order_001"
+    }
   }'
 ```
 
-When you tokenize the test card `4242 4242 4242 4242` using XPayLabs.js in test mode, it returns a token like `tok_visa_4242`. You can also use pre-built test tokens listed in the Dashboard under **Developers → Test Data**.
+### 3. Send Test USDT
 
-## Testing Webhooks
+Send the exact amount of test USDT to the deposit address returned in the response. For TRON Shasta:
+- Use a test wallet (e.g., TronLink on Shasta network)
+- Send test USDT from a faucet or another test wallet
 
-You don't need a public HTTPS endpoint to test webhooks during development. Use the **Dashboard webhook tester** to send sample events directly to any URL — including `localhost` via a tunneling tool like ngrok.
+### 4. Verify the Webhook
 
-**To test webhooks using the Dashboard:**
+Your configured webhook endpoint should receive events:
 
-1. Go to **Developers → Webhooks** in your Dashboard.
-2. Select your webhook endpoint (or create a new one).
-3. Click **Send test event** and choose an event type (e.g., `payment.succeeded`).
-4. XPayLabs sends a signed POST request to your endpoint with a realistic sample payload.
+1. `ORDER_PENDING` — Order created
+2. `ORDER_PENDING_CONFIRMATION` — Transaction detected (within seconds)
+3. `ORDER_SUCCESS` — Payment confirmed
 
-**To test webhooks locally with ngrok:**
-
-```bash
-# Start your local server on port 3000
-node server.js
-
-# In a second terminal, expose it via ngrok
-ngrok http 3000
-```
-
-Register the ngrok HTTPS URL (e.g., `https://a1b2c3d4.ngrok.io/webhooks/xpaylabs`) as a webhook endpoint in the Dashboard. All test events will be forwarded to your local server in real time.
-
-## Test Payouts
-
-To test payouts in test mode, add a test recipient in your Dashboard under **Recipients** using the bank account details below. XPayLabs recognises these values and keeps the funds within the test environment — no real bank account is touched.
-
-| Field | Test Value |
-|---|---|
-| Routing number | `110000000` |
-| Account number | `000123456789` |
-| Account type | `checking` |
-| Country | `US` |
-| Currency | `usd` |
-
-Once the test recipient is verified, call `POST /v1/payouts` with its ID to create a test payout:
+### 5. Test a Payout
 
 ```bash
-curl -X POST https://api.xpaylabs.com/v1/payouts \
-  -H "Authorization: Bearer sk_test_abc123" \
+curl -X POST http://your-gateway:3010/v1/order/createPayout \
   -H "Content-Type: application/json" \
-  -H "Idempotency-Key: test-payout-001" \
   -d '{
-    "recipient_id": "rec_xyz789",
-    "amount": 25000,
-    "currency": "usd",
-    "description": "Test payout"
+    "sign": "<computed_sign>",
+    "timestamp": 1717000000,
+    "nonce": "test_nonce_002",
+    "data": {
+      "amount": "5.00",
+      "symbol": "USDT",
+      "chain": "TRON_TEST",
+      "receiveAddress": "<your_test_wallet_address>",
+      "orderId": "test_payout_001"
+    }
   }'
 ```
 
-Test payouts transition through `pending` → `in_transit` → `paid` automatically within a few seconds in test mode, so you can verify your status-handling logic without waiting for real banking timelines.
+---
 
-## Simulating Specific Payout Failures
+## Testing Edge Cases
 
-Append a special suffix to the test account number to force a specific failure code:
-
-| Account Number | Simulated Failure |
+| Scenario | How to Test |
 |---|---|
-| `000111111113` | `insufficient_funds` |
-| `000111111116` | `invalid_account` |
-| `000111111119` | `account_closed` |
+| **Expired order** | Create a collection and wait for the expiry time |
+| **Wrong amount** | Send a different amount than requested (less than or more than) |
+| **Wrong token** | Send a different token to the deposit address |
+| **Invalid payout address** | Use an address from a different chain |
+| **Insufficient balance** | Try to create a payout larger than your wallet balance |
+| **Duplicate nonce** | Send the same request twice with the same nonce |
 
-## Switching to Live Mode
+## Going Live
 
-When your integration is working correctly in test mode, follow these steps to go live:
+When your integration is working correctly on testnet:
 
-<Steps>
-  <Step title="Complete identity and business verification">
-    Go to **Settings → Account** in your Dashboard and complete the KYB (Know Your Business) verification form. XPayLabs requires legal business information and identity verification before live payments can be processed.
-  </Step>
+1. Configure mainnet RPC endpoints in the gateway configuration.
+2. Switch chain values from testnet (e.g., `TRON_TEST`) to mainnet (e.g., `TRON`).
+3. Fund your gateway hot wallet with real tokens and gas.
+4. Test with a small real transaction before scaling up.
 
-  <Step title="Connect your bank account">
-    Navigate to **Settings → Bank Account** and add the bank account where XPayLabs will settle your funds. You'll need to verify ownership via micro-deposits or instant verification.
-  </Step>
-
-  <Step title="Replace your API keys">
-    Swap every instance of `sk_test_...` with your `sk_live_...` secret key and `pk_test_...` with your `pk_live_...` publishable key. Store live keys exclusively in environment variables — never hard-code them or commit them to source control.
-
-    ```bash
-    # .env (production)
-    XPAYLABS_SECRET_KEY=sk_live_...
-    XPAYLABS_PUBLISHABLE_KEY=pk_live_...
-    XPAYLABS_WEBHOOK_SECRET=whsec_live_...
-    ```
-  </Step>
-
-  <Step title="Enable webhook signature verification">
-    In **Developers → Webhooks**, copy the live webhook signing secret (`whsec_live_...`) and update your `XPAYLABS_WEBHOOK_SECRET` environment variable. Verify that your endpoint correctly validates the `x-xpaylabs-signature` header on every incoming event.
-  </Step>
-</Steps>
-
-## Go-Live Checklist
-
-Run through this checklist before accepting your first live payment:
-
-<CardGroup cols={2}>
-  <Card title="Identity Verified" icon="shield-check">
-    KYB / identity verification completed and approved in the Dashboard.
-  </Card>
-  <Card title="Bank Account Connected" icon="building-columns">
-    Settlement bank account added and verified.
-  </Card>
-  <Card title="Live Keys Configured" icon="key">
-    `sk_live_...` and `pk_live_...` keys in use; no test keys in production environment variables.
-  </Card>
-  <Card title="Webhook Signatures Enabled" icon="webhook">
-    All webhook endpoints validate the `x-xpaylabs-signature` header using your live signing secret.
-  </Card>
-  <Card title="Idempotency Keys Implemented" icon="arrows-rotate">
-    Every `POST /v1/payments`, `POST /v1/refunds`, and `POST /v1/payouts` call includes a unique `Idempotency-Key` header.
-  </Card>
-  <Card title="Error Handling Tested" icon="triangle-exclamation">
-    Your UI gracefully handles `failed` payment statuses, network errors, and declined card messages.
-  </Card>
-</CardGroup>
+<Tip>
+  Testnet USDT and gas tokens have no real value. You can be as liberal as you like with test transactions. Use this to thoroughly verify your webhook handling, order status polling, and error handling logic.
+</Tip>

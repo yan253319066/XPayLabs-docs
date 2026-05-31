@@ -13,14 +13,18 @@
   "navbar": {
     "links": [
       {
-        "label": "Support",
-        "href": "mailto:support@xpaylabs.com"
+        "label": "Website",
+        "href": "https://xpaylabs.com"
+      },
+      {
+        "label": "GitHub",
+        "href": "https://github.com/xpaylabs"
       }
     ],
     "primary": {
       "type": "button",
-      "label": "Dashboard",
-      "href": "https://dashboard.xpaylabs.com"
+      "label": "Get Started",
+      "href": "/quickstart"
     }
   },
   "navigation": {
@@ -49,7 +53,6 @@
             "group": "Guides",
             "pages": [
               "guides/accept-payments",
-              "guides/refunds",
               "guides/payouts",
               "guides/testing"
             ]
@@ -71,22 +74,23 @@
             "pages": [
               "api-reference/overview",
               "api-reference/authentication",
-              "api-reference/pagination"
+              "api-reference/errors"
             ]
           },
           {
-            "group": "Payments",
+            "group": "Orders",
             "pages": [
-              "api-reference/payments/create",
-              "api-reference/payments/retrieve",
-              "api-reference/payments/list"
+              "api-reference/order/create-collection",
+              "api-reference/order/create-payout",
+              "api-reference/order/status",
+              "api-reference/order/pay-link",
+              "api-reference/order/order-status"
             ]
           },
           {
-            "group": "Refunds",
+            "group": "Symbols",
             "pages": [
-              "api-reference/refunds/create",
-              "api-reference/refunds/retrieve"
+              "api-reference/symbols/support-symbols"
             ]
           },
           {

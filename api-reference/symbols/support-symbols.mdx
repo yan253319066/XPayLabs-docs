@@ -1,0 +1,99 @@
+---
+title: "List Supported Symbols | GET /v1/symbol/supportSymbols"
+sidebarTitle: "Support Symbols"
+description: "Retrieve the list of supported blockchain tokens configured on your gateway. Filter by chain or symbol to narrow results."
+---
+
+Returns the list of supported symbols (tokens) configured on your gateway. The gateway administrator configures which tokens are available for each blockchain.
+
+## Request
+
+**`GET http://your-gateway:3010/v1/symbol/supportSymbols`**
+
+### Query Parameters
+
+<ParamField query="chain" type="string" optional>
+  Filter by blockchain network. Example: `TRON`, `ETH`, `BSC`, `POLYGON`. Omit to return symbols for all chains.
+</ParamField>
+
+<ParamField query="symbol" type="string" optional>
+  Filter by token symbol. Example: `USDT`, `USDC`. Omit to return all supported symbols.
+</ParamField>
+
+### cURL
+
+```bash
+# All supported symbols
+curl http://your-gateway:3010/v1/symbol/supportSymbols
+
+# Filter by chain
+curl "http://your-gateway:3010/v1/symbol/supportSymbols?chain=TRON"
+
+# Filter by symbol
+curl "http://your-gateway:3010/v1/symbol/supportSymbols?symbol=USDT"
+```
+
+---
+
+## Response
+
+A successful request returns HTTP `200` with the `R<List<SupportSymbol>>` envelope.
+
+### SupportSymbol Object
+
+<ResponseField name="symbol" type="string">
+  The token symbol, e.g. `"USDT"`, `"USDC"`, `"ETH"`.
+</ResponseField>
+
+<ResponseField name="chain" type="string">
+  The blockchain network, e.g. `"TRON"`, `"ETH"`, `"BSC"`.
+</ResponseField>
+
+<ResponseField name="contractAddress" type="string | null">
+  The token contract address on this chain. `null` for native coins (e.g., ETH on Ethereum).
+</ResponseField>
+
+<ResponseField name="decimals" type="integer">
+  The number of decimal places for this token. Example: `18` for ERC20 USDT, `6` for TRC20 USDT.
+</ResponseField>
+
+### Example Response
+
+```json
+{
+  "code": 200,
+  "msg": "success",
+  "data": [
+    {
+      "symbol": "USDT",
+      "chain": "TRON",
+      "contractAddress": "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
+      "decimals": 6
+    },
+    {
+      "symbol": "USDT",
+      "chain": "ETH",
+      "contractAddress": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+      "decimals": 6
+    },
+    {
+      "symbol": "USDC",
+      "chain": "ETH",
+      "contractAddress": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+      "decimals": 6
+    },
+    {
+      "symbol": "USDT",
+      "chain": "BSC",
+      "contractAddress": "0x55d398326f99059fF775485246999027B3197955",
+      "decimals": 18
+    },
+    {
+      "symbol": "USDC",
+      "chain": "SUI",
+      "contractAddress": null,
+      "decimals": 6
+    }
+  ]
+}
+```

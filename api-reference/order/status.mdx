@@ -1,0 +1,147 @@
+---
+title: "Get Order Status | GET /v1/order/status/{orderId}"
+sidebarTitle: "Order Status"
+description: "Retrieve the full status and details of an order by its orderId. Returns the NotifyOrder object with status, amount, transaction info, and fee."
+---
+
+Fetch the current status and full details of any order (collection or payout) by its `orderId`. This endpoint is authenticated and intended for merchant server-to-server use.
+
+## Request
+
+**`GET http://your-gateway:3010/v1/order/status/{orderId}`**
+
+### Path Parameters
+
+<ParamField path="orderId" type="string" required>
+  The order identifier you specified when creating the collection or payout. Example: `order_1042`.
+</ParamField>
+
+### cURL
+
+```bash
+curl http://your-gateway:3010/v1/order/status/order_1042 \
+  -H "Content-Type: application/json"
+```
+
+---
+
+## Response
+
+A successful request returns HTTP `200` with the `R<NotifyOrder>` envelope.
+
+### NotifyOrder Object
+
+<ResponseField name="orderId" type="string">
+  The order identifier that was used when creating the collection or payout.
+</ResponseField>
+
+<ResponseField name="uid" type="string">
+  The user identifier associated with the order, if provided.
+</ResponseField>
+
+<ResponseField name="orderType" type="string">
+  The type of order: `COLLECTION` or `PAYOUT`.
+</ResponseField>
+
+<ResponseField name="status" type="string">
+  Current order status:
+  - `INIT` — Order created, awaiting customer payment
+  - `PENDING` — Transaction detected, awaiting confirmations
+  - `PENDING_CONFIRMATION` — Waiting for block confirmations
+  - `SUCCESS` — Payment confirmed successfully
+  - `EXPIRED` — Order expired without payment
+  - `FAILED` — Transaction failed
+</ResponseField>
+
+<ResponseField name="reason" type="string | null">
+  If the order failed or expired, this field contains the reason. `null` otherwise.
+</ResponseField>
+
+<ResponseField name="amount" type="string">
+  The requested amount as a decimal string (e.g., `"250.00"`).
+</ResponseField>
+
+<ResponseField name="actualAmount" type="string">
+  The actual amount received/paid. May differ from `amount` due to network fees or partial fills. `null` until confirmed.
+</ResponseField>
+
+<ResponseField name="fee" type="string">
+  The platform handling fee deducted (if applicable). `"0"` for zero-fee configurations.
+</ResponseField>
+
+<ResponseField name="transaction" type="object | null">
+  Blockchain transaction details. `null` until a transaction is detected. See below.
+</ResponseField>
+
+### Transaction Object
+
+<ResponseField name="chain" type="string">
+  The blockchain network (e.g., `"TRON"`, `"ETH"`, `"BSC"`).
+</ResponseField>
+
+<ResponseField name="symbol" type="string">
+  The token symbol (e.g., `"USDT"`).
+</ResponseField>
+
+<ResponseField name="txid" type="string">
+  The blockchain transaction hash.
+</ResponseField>
+
+<ResponseField name="from" type="string">
+  The sender's blockchain address.
+</ResponseField>
+
+<ResponseField name="to" type="string">
+  The receiver's blockchain address.
+</ResponseField>
+
+<ResponseField name="amount" type="string">
+  The transfer amount in decimal format.
+</ResponseField>
+
+<ResponseField name="blockNum" type="integer">
+  The block number where the transaction was included.
+</ResponseField>
+
+<ResponseField name="confirmedNum" type="integer">
+  The number of block confirmations received.
+</ResponseField>
+
+<ResponseField name="status" type="string">
+  Blockchain transaction status: `PENDING`, `SUCCESS`, or `FAILED`.
+</ResponseField>
+
+<ResponseField name="timestamp" type="integer">
+  Unix timestamp of when the transaction was included in a block.
+</ResponseField>
+
+### Example Response
+
+```json
+{
+  "code": 200,
+  "msg": "success",
+  "data": {
+    "orderId": "order_1042",
+    "uid": "user_42",
+    "orderType": "COLLECTION",
+    "status": "SUCCESS",
+    "reason": null,
+    "amount": "250.00",
+    "actualAmount": "249.50",
+    "fee": "0.00",
+    "transaction": {
+      "chain": "TRON",
+      "symbol": "USDT",
+      "txid": "a1b2c3d4e5f6...",
+      "from": "TXyz...",
+      "to": "TWkKZkmuB8DpVeiMoHiKf99ZoFHzk73CqR",
+      "amount": "250.00",
+      "blockNum": 12345678,
+      "confirmedNum": 3,
+      "status": "SUCCESS",
+      "timestamp": 1717000123
+    }
+  }
+}
+```

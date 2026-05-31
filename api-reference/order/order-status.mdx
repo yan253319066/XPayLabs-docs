@@ -1,0 +1,87 @@
+---
+title: "Get Compact Order Status | GET /v1/order/getOrderStatus"
+sidebarTitle: "Compact Order Status"
+description: "Quickly retrieve just the status of an order by orderId and sign. Returns only the PaymentOrderStatus object for lightweight polling."
+---
+
+A lightweight endpoint that returns only the order's current status. Use this for polling scenarios where you need to check whether a payment has been confirmed without retrieving the full order details.
+
+## Request
+
+**`GET http://your-gateway:3010/v1/order/getOrderStatus?orderId={orderId}&sign={sign}`**
+
+### Query Parameters
+
+<ParamField query="orderId" type="string" required>
+  The order identifier. Example: `order_1042`.
+</ParamField>
+
+<ParamField query="sign" type="string" required>
+  HMAC-SHA256 signature computed over the `orderId` value.
+</ParamField>
+
+### cURL
+
+```bash
+curl "http://your-gateway:3010/v1/order/getOrderStatus?orderId=order_1042&sign=a1b2c3d4e5f6..."
+```
+
+---
+
+## Response
+
+A successful request returns HTTP `200` with the `R<PaymentOrderStatus>` envelope.
+
+### PaymentOrderStatus Object
+
+<ResponseField name="status" type="string">
+  Current order status:
+  - `INIT` — Awaiting payment
+  - `PENDING` — Transaction detected
+  - `PENDING_CONFIRMATION` — Awaiting block confirmations
+  - `SUCCESS` — Payment confirmed
+  - `EXPIRED` — Order expired
+  - `FAILED` — Payment failed
+</ResponseField>
+
+### Example Response
+
+```json
+{
+  "code": 200,
+  "msg": "success",
+  "data": {
+    "status": "SUCCESS"
+  }
+}
+```
+
+---
+
+## Usage Example
+
+```javascript
+// Polling loop for payment confirmation
+async function waitForPayment(orderId, token) {
+  const sign = computeSign(orderId, token);
+
+  for (let i = 0; i < 120; i++) {
+    const response = await fetch(
+      `http://your-gateway:3010/v1/order/getOrderStatus?orderId=${orderId}&sign=${sign}`
+    );
+    const result = await response.json();
+
+    if (result.data.status === "SUCCESS") {
+      console.log("Payment confirmed!");
+      return true;
+    }
+    if (result.data.status === "EXPIRED" || result.data.status === "FAILED") {
+      console.log("Payment failed or expired");
+      return false;
+    }
+
+    await new Promise(r => setTimeout(r, 2000)); // poll every 2 seconds
+  }
+  return false;
+}
+```
