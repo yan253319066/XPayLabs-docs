@@ -1,0 +1,187 @@
+---
+title: "AI 代理支付：自主加密货币交易"
+sidebarTitle: "AI 代理加密支付"
+description: "使 AI 代理能够自主发送和接收稳定币支付。面向代理工作流的非托管、自托管加密支付基础设施。"
+keywords: ["AI 代理", "自主支付", "AI 支付", "稳定币", "非托管", "XPayLabs"]
+---
+
+AI 代理可以使用 XPayLabs 自主发送和接收稳定币支付。代理调用 REST API 创建收款订单和发起付款，监听 Webhook 事件，并管理余额——零网关费用，资金完全自托管。
+
+## 为什么 AI 代理需要加密货币？
+
+| 挑战 | XPayLabs 解决方案 |
+|---|---|
+| 代理需要可编程货币 | REST API 支持 createCollection/createPayout——代理直接调用端点 |
+| 无需人工参与审批 | 使用环境变量中存储的密钥自动签名 |
+| 跨境代理间支付 | TRON、EVM 和 SUI 上的稳定币数秒内完成结算 |
+| 微交易 | 零网关费用——仅区块链 gas 费用（$0.01–$0.50） |
+| 需自托管 | 非托管——密钥保留在您的 Docker 容器中 |
+
+## 代理支付流程
+
+### 收款（代理获得支付）
+
+代理通过创建收款订单来接收加密支付。这是最常见的流程——用户或其他代理将资金发送到代理生成的充值地址。
+
+```typescript
+async function requestPayment(userId: string, amount: number, orderId: string) {
+  const collection = await xpay.createCollection({
+    amount,
+    symbol: 'USDT',
+    chain: 'TRON',
+    orderId,
+    uid: userId,
+  });
+
+  return {
+    depositAddress: collection.data.address,
+    expiresAt: collection.data.expiredTime,
+    checkoutUrl: collection.data.paymentUrl,
+  };
+}
+```
+
+代理随后监听 `ORDER_SUCCESS` Webhook 以释放服务：
+
+```typescript
+app.post('/webhook', (req, res) => {
+  const event = xpay.parseWebhook(JSON.stringify(req.body), req.body.sign, req.body.timestamp.toString());
+
+  if (event?.notifyType === 'ORDER_SUCCESS') {
+    const data = event.data as any;
+    await unlockService(data.orderId, data.actualAmount);
+  }
+
+  res.status(200).send('ok');
+});
+```
+
+### 付款（代理支付）
+
+代理向外部地址发起付款——支付计算费用、质押或与其他代理结算：
+
+```typescript
+async function payComputeProvider(providerAddress: string, amount: number, jobId: string) {
+  const payout = await xpay.createPayout({
+    amount,
+    symbol: 'USDT',
+    chain: 'ETH',
+    orderId: `compute-${jobId}`,
+    receiveAddress: providerAddress,
+    uid: 'ai-agent-01',
+  });
+
+  return payout.data.orderId;
+}
+```
+
+### 代理间支付
+
+两个自主代理可以直接交易：
+
+```
+Agent A  ──POST /v1/order/createCollection──▶  网关  ──返回充值地址──▶  Agent A
+                                                                             │
+                                                                             │ 将充值地址发送给 Agent B
+                                                                             ▼
+Agent B  ──发送 USDT 到地址──────────────▶  区块链  ──扫描器检测──▶  网关
+                                                                             │
+                                                                             │ ORDER_SUCCESS Webhook
+                                                                             ▼
+Agent A  ──接收 Webhook──▶  履行协议
+```
+
+## 自主代理架构
+
+```
+┌─────────────────────────────────────────────────┐
+│                   您的服务器                      │
+│                                                   │
+│  ┌──────────┐     ┌─────────────┐               │
+│  │  Agent A  │────▶│ XPayLabs    │               │
+│  │ (买方)    │◀───│ SDK / API   │               │
+│  └──────────┘     └──────┬──────┘               │
+│                          │                       │
+│  ┌──────────┐            │   ┌───────────────┐  │
+│  │  Agent B  │───────────┘   │  Webhook      │  │
+│  │ (卖方)    │───────────────│  端点         │  │
+│  └──────────┘               └───────────────┘  │
+│                          │                       │
+│                   ┌──────▼──────┐               │
+│                   │  区块链     │               │
+│                   │  扫描器     │               │
+│                   └─────────────┘               │
+└─────────────────────────────────────────────────┘
+```
+
+## 关键设计考量
+
+### 密钥管理
+
+商家令牌和 API 密钥必须在运行时对代理可用，且不能硬编码：
+
+```bash
+# 环境变量——切勿提交到 git
+XPAYLABS_MERCHANT_TOKEN=your-merchant-token
+XPAYLABS_API_SECRET=your-api-secret
+XPAYLABS_GATEWAY_URL=http://gateway:3010
+```
+
+### 幂等性
+
+代理可能会重试失败的请求。使用 `orderId` 字段作为幂等键——在 `createCollection` 或 `createPayout` 调用中使用相同的 `orderId` 会返回现有订单，而不会创建重复订单。
+
+### Webhook 可靠性
+
+如果 Webhook 丢失，代理应使用轮询回退（`getOrderStatus`）。每 3 秒轮询一次直到 `SUCCESS`、`EXPIRED` 或 `FAILED`：
+
+```typescript
+async function waitForConfirmation(orderId: string, maxWaitMs = 120000): Promise<boolean> {
+  const start = Date.now();
+
+  while (Date.now() - start < maxWaitMs) {
+    const status = await xpay.getOrderStatus(orderId);
+    const s = status.data?.status;
+
+    if (s === 'SUCCESS') return true;
+    if (s === 'EXPIRED' || s === 'FAILED') return false;
+
+    await new Promise(r => setTimeout(r, 3000));
+  }
+
+  return false;
+}
+```
+
+### 余额管理
+
+在创建付款前，检查网关热钱包余额：
+
+```typescript
+const balance = await xpay.getMerchantBalance('USDT');
+console.log(`可用：${balance.data?.balance}，冻结：${balance.data?.frozenBalance}`);
+```
+
+对于 EVM 链，还需确保热钱包有足够的原生 gas 代币（ETH、BNB、MATIC、AVAX）来支付交易费用。
+
+## 应用场景
+
+| 场景 | 流程 | 示例 |
+|---|---|---|
+| API 按次付费访问 | 代理创建收款→用户支付→Webhook 解锁端点 | LLM 推理 API |
+| 计算资源市场 | Agent A 通过付款向 Agent B 支付 GPU 时间 | 分布式 ML 训练 |
+| 自主联盟营销 | 联盟代理接收收款 Webhook，向推荐人分配付款 | 推荐计划 |
+| 代理间结算 | 代理钱包之间的定期批量付款 | 跨代理记账 |
+| 微支付流 | 频繁的小额收款 | 实时数据流 |
+
+## 开始使用
+
+1. 通过 [Docker Compose](/zh/quickstart) 部署 XPayLabs
+2. 安装 [Node.js SDK](/zh/guides/nodejs-integration) 或直接调用 [REST API](/zh/api-reference/overview)
+3. 使用商家令牌和 API 密钥配置代理的环境
+4. 为 `ORDER_SUCCESS` 事件创建 Webhook 端点
+5. 开始通过编程方式创建收款和付款订单
+
+<Tip>
+  对于代理间支付，两个代理可以共享同一个 XPayLabs 网关实例——或者运行各自的独立实例以实现完全隔离。
+</Tip>

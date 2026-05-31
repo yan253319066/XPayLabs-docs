@@ -1,0 +1,258 @@
+---
+title: "Spring Boot + XPayLabs：Java SDK 加密支付"
+sidebarTitle: "Spring Boot 集成"
+description: "使用 XPayLabs Java SDK 将加密支付集成到您的 Spring Boot 应用程序中。Maven 配置、Webhook 处理和完整的 API 示例。"
+keywords: ["Spring Boot", "Java", "SDK", "集成", "Maven", "加密支付", "XPayLabs"]
+---
+
+使用官方 XPayLabs Java SDK（`xpay-java-sdk`）将加密支付集成到您的 Spring Boot 应用程序中。SDK 提供全面的客户端，支持收款订单、付款、Webhook 处理和余额管理，HMAC-SHA256 签名自动处理。
+
+## 安装
+
+将 Maven 依赖添加到您的 `pom.xml`：
+
+```xml
+<dependency>
+  <groupId>io.xpay</groupId>
+  <artifactId>xpay-java-sdk</artifactId>
+  <version>0.1.0</version>
+</dependency>
+```
+
+对于 Gradle：
+
+```groovy
+implementation 'io.xpay:xpay-java-sdk:0.1.0'
+```
+
+## 配置
+
+使用您的商家令牌和 API 密钥配置 SDK：
+
+```java
+import io.xpay.sdk.XPay;
+import io.xpay.sdk.XPayConfig;
+
+@Configuration
+public class XPayConfigBean {
+
+  @Bean
+  public XPay xPayClient() {
+    XPayConfig config = XPayConfig.builder()
+        .apiKey("your-merchant-token")
+        .apiSecret("your-api-secret")
+        .baseUrl("http://your-gateway:3010")
+        .connectTimeout(30000)
+        .readTimeout(30000)
+        .build();
+
+    return new XPay(config);
+  }
+}
+```
+
+| 属性 | 必填 | 描述 |
+|---|---|---|
+| `apiKey` | 是 | 商家令牌 |
+| `apiSecret` | 是 | 用于 HMAC 签名的 API 密钥 |
+| `baseUrl` | 否 | 网关基础 URL（默认：`https://api.xpaylabs.com`）|
+| `connectTimeout` | 否 | 连接超时（毫秒，默认：30000）|
+| `readTimeout` | 否 | 读取超时（毫秒，默认：30000）|
+
+## 核心 API 方法
+
+### 创建收款订单
+
+```java
+import io.xpay.sdk.model.request.CollectionRequest;
+import io.xpay.sdk.model.response.ApiResponse;
+import io.xpay.sdk.model.response.CollectionData;
+
+@RestController
+public class PaymentController {
+
+  private final XPay xpay;
+
+  public PaymentController(XPay xpay) {
+    this.xpay = xpay;
+  }
+
+  public CollectionData createPayment(String uid, String amount) throws Exception {
+    CollectionRequest request = CollectionRequest.builder()
+        .amount(50.0)
+        .symbol("USDT")
+        .chain("TRON")
+        .orderId("order-" + System.currentTimeMillis())
+        .uid(uid)
+        .build();
+
+    ApiResponse<CollectionData> response = xpay.createCollection(request);
+
+    if (response.getCode() != 200) {
+      throw new RuntimeException("Collection failed: " + response.getMsg());
+    }
+
+    return response.getData();
+  }
+}
+```
+
+### 创建付款
+
+```java
+import io.xpay.sdk.model.request.PayoutRequest;
+import io.xpay.sdk.model.response.PayoutData;
+
+public PayoutData sendPayout(String uid, String amount, String receiveAddress) throws Exception {
+  PayoutRequest request = PayoutRequest.builder()
+      .amount(100.0)
+      .symbol("USDT")
+      .chain("TRON")
+      .orderId("payout-" + System.currentTimeMillis())
+      .uid(uid)
+      .receiveAddress(receiveAddress)
+      .build();
+
+  ApiResponse<PayoutData> response = xpay.createPayout(request);
+  return response.getData();
+}
+```
+
+### 查询订单状态
+
+```java
+import io.xpay.sdk.model.response.OrderDetails;
+
+public OrderDetails getStatus(String orderId) throws Exception {
+  ApiResponse<OrderDetails> response = xpay.getOrderStatus(orderId);
+  return response.getData();
+}
+```
+
+### 获取支持的代币
+
+```java
+import io.xpay.sdk.model.response.SupportedSymbol;
+
+public List<SupportedSymbol> getSymbols() throws Exception {
+  ApiResponse<List<SupportedSymbol>> response = xpay.getSupportedSymbols();
+  return response.getData();
+}
+
+public List<SupportedSymbol> getSymbols(String chain, String symbol) throws Exception {
+  ApiResponse<List<SupportedSymbol>> response = xpay.getSupportedSymbols(chain, symbol);
+  return response.getData();
+}
+```
+
+### 获取商家余额
+
+```java
+import io.xpay.sdk.model.request.MerchantBalanceRequest;
+import io.xpay.sdk.model.response.MerchantBalanceData;
+
+public MerchantBalanceData getBalance(String symbol) throws Exception {
+  MerchantBalanceRequest request = MerchantBalanceRequest.builder()
+      .symbol(symbol)
+      .build();
+
+  ApiResponse<MerchantBalanceData> response = xpay.getMerchantBalance(request);
+  return response.getData();
+}
+```
+
+### 获取用户的充值地址
+
+```java
+import io.xpay.sdk.model.request.CryptoAddressRequest;
+import io.xpay.sdk.model.response.CryptoAddressData;
+
+public CryptoAddressData getDepositAddress(String uid, String chain, String symbol) throws Exception {
+  CryptoAddressRequest request = CryptoAddressRequest.builder()
+      .chain(chain)
+      .symbol(symbol)
+      .uid(uid)
+      .build();
+
+  ApiResponse<CryptoAddressData> response = xpay.getCryptoAddress(request);
+  return response.getData();
+}
+```
+
+## 处理 Webhook
+
+SDK 提供内置的 Webhook 签名验证和事件解析。设置一个控制器来接收 Webhook 回调：
+
+```java
+import io.xpay.sdk.model.webhook.WebhookEvent;
+import io.xpay.sdk.model.webhook.OrderWebhookData;
+import io.xpay.sdk.model.webhook.CollectWebhookData;
+
+@RestController
+public class WebhookController {
+
+  private final XPay xpay;
+
+  public WebhookController(XPay xpay) {
+    this.xpay = xpay;
+  }
+
+  @PostMapping("/webhook")
+  public ResponseEntity<String> handleWebhook(@RequestBody String body) {
+    WebhookEvent event = xpay.parseWebhook(body);
+
+    if (event == null) {
+      return ResponseEntity.badRequest().body("无效的 Webhook 签名");
+    }
+
+    switch (event.getNotifyType()) {
+      case ORDER_PENDING:
+        System.out.println("订单待处理：" + ((OrderWebhookData) event.getData()).getOrderId());
+        break;
+
+      case ORDER_SUCCESS:
+        OrderWebhookData orderData = (OrderWebhookData) event.getData();
+        System.out.println("订单 " + orderData.getOrderId() + " 已完成！");
+        break;
+
+      case ORDER_FAILED:
+        OrderWebhookData failedData = (OrderWebhookData) event.getData();
+        System.out.println("订单失败：" + failedData.getReason());
+        break;
+
+      case COLLECT_SUCCESS:
+        CollectWebhookData collectData = (CollectWebhookData) event.getData();
+        System.out.println("归集完成！金额：" + collectData.getCollectAmount());
+        break;
+    }
+
+    return ResponseEntity.ok("Webhook received");
+  }
+}
+```
+
+## 错误处理
+
+SDK 针对 API 错误抛出 `XPayApiException`：
+
+```java
+import io.xpay.sdk.exception.XPayApiException;
+
+try {
+  ApiResponse<PayoutData> response = xpay.createPayout(request);
+} catch (XPayApiException e) {
+  System.err.println("API 错误：" + e.getMessage());
+  System.err.println("HTTP 状态：" + e.getStatusCode());
+  System.err.println("错误码：" + e.getErrorCode());
+} catch (Exception e) {
+  System.err.println("意外错误：" + e.getMessage());
+}
+```
+
+## 完整示例
+
+请参阅 SDK 仓库中的 [`XPayExample.java`](https://github.com/yan253319066/XPayLabs-java-sdk) 类，获取涵盖所有 API 操作的完整示例。
+
+<Tip>
+  SDK 使用 HMAC-SHA256 进行请求签名。`XPay` 类会自动处理——您只需传入请求对象，它会内部管理 `sign`、`timestamp` 和 `nonce` 字段。
+</Tip>

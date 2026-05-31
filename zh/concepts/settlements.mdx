@@ -1,0 +1,80 @@
+---
+title: "结算：热钱包资金自动归集到冷钱包"
+sidebarTitle: "结算"
+description: "XPayLabs 自动将收到的资金从热钱包归集到您的冷钱包。为每条支持的区块链配置结算规则和阈值。"
+keywords: ["结算", "归集", "热钱包", "冷钱包", "自动归集", "XPayLabs"]
+---
+
+结算是指将收到的资金从网关的**热钱包**（客户支付到达的地方）自动转移到您的**冷钱包**（资金被安全持有以备长期存储的地方）的过程。这个过程被称为"归集"。与传统的支付处理器按 T+2 时间表批量结算不同，XPayLabs 结算是区块链原生的——资金在您的钱包之间链上直接转移，几分钟而非几天。
+
+## 结算如何工作？
+
+```
+客户支付        热钱包            冷钱包
+     |                     |                     |
+     |--- USDT 到达 --->|                     |
+     |                     |-- 触发归集 --->|
+     |                     |   (自动或手动)    |
+     |                     |                     |
+     |                     |<-- 归集确认 ----|
+     |<-- Webhook: COLLECT_SUCCESS              |
+```
+
+<Steps>
+  <Step title="资金到达热钱包">
+    当客户支付确认后（`ORDER_SUCCESS`），USDT（或其他代币）存放在网关的热钱包中——一个用于接收支付的在线钱包。
+  </Step>
+  <Step title="触发归集">
+    结算可以通过两种方式触发：
+    - **自动：** 网关监控累计余额，并在达到可配置的阈值时发起归集（例如每 1000 USDT 或每小时）。
+    - **手动：** 管理员通过网关管理面板触发归集。
+  </Step>
+  <Step title="链上转账">
+    网关构建并签署一笔区块链交易，将累计代币从热钱包转移到冷钱包地址。该交易支付标准的区块链 gas 费用。
+  </Step>
+  <Step title="归集确认">
+    一旦转账交易达到足够的区块确认数，会发送 `COLLECT_SUCCESS` Webhook。如果交易失败，则发送 `COLLECT_FAILED`。
+  </Step>
+</Steps>
+
+## 配置
+
+您在网关的 `application.yml` 中配置结算：
+
+```yaml
+xpay:
+  settlement:
+    cold-wallet-addresses:
+      TRON: "TYourColdWalletAddress..."
+      ETH: "0xYourColdWalletAddress..."
+      BSC: "0xYourColdWalletAddress..."
+    auto-sweep:
+      enabled: true
+      min-amount: "1000"     # 触发归集的最低 USDT 金额
+      max-amount: "10000"    # 每笔归集交易的最大 USDT 金额
+      interval: 3600         # 检查间隔（秒，1 小时）
+    sweep-on-collect: true   # 每次收款后立即归集
+```
+
+## 结算 vs. 付款
+
+| | 结算 | 付款 |
+|---|---|---|
+| **方向** | 热钱包 → 冷钱包 | 网关钱包 → 外部地址 |
+| **目的** | 在冷钱包中安全保管资金 | 向供应商或用户付款 |
+| **触发方式** | 按阈值自动 | 通过 API (`/createPayout`) 手动 |
+| **目标地址** | 您自己的冷钱包 | 任何有效的区块链地址 |
+
+## Webhook 事件
+
+结算事件通过与订单事件相同的 Webhook 系统投递：
+
+| 事件 | 触发时机 |
+|---|---|
+| `COLLECT_PENDING` | 归集交易已提交到区块链 |
+| `COLLECT_SUCCESS` | 归集交易已确认 |
+| `COLLECT_FAILED` | 归集交易失败 |
+
+<Note>
+  结算是一个非托管过程——网关只是按照您的规则移动资金的软件。任何第三方都无法访问您的私钥或转移资金。所有交易都在您的 Docker 容器内本地签署。
+</Note>

@@ -1,0 +1,123 @@
+---
+title: "在测试网上测试加密支付：XPayLabs 指南"
+sidebarTitle: "测试"
+description: "在上线前在区块链测试网上测试您的 XPayLabs 支付集成。配置测试网端点，从水龙头获取测试代币，并验证收款到 Webhook 的完整流程。"
+keywords: ["测试", "测试网", "水龙头", "Shasta", "Sepolia", "USDT", "XPayLabs"]
+---
+
+在处理正式网络交易之前，先在区块链测试网上测试您的 XPayLabs 集成。测试网网络模拟真实的区块链环境，无需使用真实资金——从水龙头获取测试 USDT，无风险地验证完整的收款到 Webhook 流程。
+
+## XPayLabs 支持哪些测试网？
+
+| 测试网 | 链值 | 水龙头 |
+|---|---|---|
+| TRON Shasta | `TRON_TEST` | [TRON Shasta 水龙头](https://shasta.tronscan.org/) |
+| Ethereum Sepolia | `ETH_SEPOLIA` | [Sepolia 水龙头](https://sepoliafaucet.com/) |
+| BSC Testnet | `BSC_TEST` | [BSC 测试网水龙头](https://testnet.bnbchain.org/faucet-smart) |
+| Polygon Amoy | `POLYGON_AMOY` | [Polygon 水龙头](https://faucet.polygon.technology/) |
+| Avalanche Fuji | `AVAX_FUJI_TEST` | [Avalanche 水龙头](https://faucet.avax.network/) |
+| SUI Testnet | `SUI_TEST` | [SUI 水龙头](https://faucet.sui.io/) |
+
+## 配置
+
+在网关配置中配置测试网 RPC 端点：
+
+```yaml
+xpay:
+  blockchain:
+    tron:
+      mainnet:
+        rpc-url: "https://api.trongrid.io"
+      testnet:
+        rpc-url: "https://api.shasta.trongrid.io"
+    ethereum:
+      sepolia:
+        rpc-url: "https://rpc.sepolia.org"
+    bsc:
+      testnet:
+        rpc-url: "https://data-seed-prebsc-1-s1.binance.org:8545"
+```
+
+## 如何测试完整的支付流程
+
+### 1. 获取测试代币
+
+访问所选测试网的水龙头，请求测试 USDT 或原生代币（TRX、ETH、BNB）。您需要：
+- **原生 gas 代币**（TRX、ETH、BNB）来支付区块链费用
+- **测试 USDT** 来模拟客户支付
+
+### 2. 创建测试收款
+
+```bash
+curl -X POST http://your-gateway:3010/v1/order/createCollection \
+  -H "Content-Type: application/json" \
+  -d '{
+    "sign": "<computed_sign>",
+    "timestamp": 1717000000,
+    "nonce": "test_nonce_001",
+    "data": {
+      "amount": "10.00",
+      "symbol": "USDT",
+      "chain": "TRON_TEST",
+      "orderId": "test_order_001"
+    }
+  }'
+```
+
+### 3. 发送测试 USDT
+
+将精确金额的测试 USDT 发送到响应中返回的充值地址。对于 TRON Shasta：
+- 使用测试钱包（例如 Shasta 网络上的 TronLink）
+- 从水龙头或其他测试钱包发送测试 USDT
+
+### 4. 验证 Webhook
+
+您配置的 Webhook 端点应收到以下事件：
+1. `ORDER_PENDING` — 订单已创建
+2. `ORDER_PENDING_CONFIRMATION` — 检测到交易（数秒内）
+3. `ORDER_SUCCESS` — 支付已确认
+
+### 5. 测试付款
+
+```bash
+curl -X POST http://your-gateway:3010/v1/order/createPayout \
+  -H "Content-Type: application/json" \
+  -d '{
+    "sign": "<computed_sign>",
+    "timestamp": 1717000000,
+    "nonce": "test_nonce_002",
+    "data": {
+      "amount": "5.00",
+      "symbol": "USDT",
+      "chain": "TRON_TEST",
+      "receiveAddress": "<your_test_wallet_address>",
+      "orderId": "test_payout_001"
+    }
+  }'
+```
+
+---
+
+## 如何测试边界情况
+
+| 场景 | 测试方法 |
+|---|---|
+| **订单过期** | 创建收款并等待过期时间 |
+| **金额错误** | 发送与请求金额不同的金额（少于或多于） |
+| **代币错误** | 向充值地址发送不同的代币 |
+| **无效的付款地址** | 使用来自不同链的地址 |
+| **余额不足** | 尝试创建大于钱包余额的付款 |
+| **重复 nonce** | 使用相同的 nonce 发送两次相同的请求 |
+
+## 上线
+
+当您的集成在测试网上正常运行后：
+
+1. 在网关配置中配置主网 RPC 端点。
+2. 将链值从测试网（例如 `TRON_TEST`）切换为主网（例如 `TRON`）。
+3. 使用真实代币和 gas 为您的网关热钱包充值。
+4. 先从小额真实交易开始测试，再逐步扩大规模。
+
+<Tip>
+  测试网上的 USDT 和 gas 代币没有实际价值。您可以在测试交易中自由操作。利用这一点全面验证您的 Webhook 处理、订单状态轮询和错误处理逻辑。
+</Tip>

@@ -1,0 +1,210 @@
+---
+title: "接受加密支付：收款订单指南"
+sidebarTitle: "接受支付"
+description: "通过 XPayLabs 收款订单接受稳定币支付。在本逐步指南中创建充值地址、生成结账页面并处理 Webhook 回调。"
+keywords: ["接受支付", "收款", "USDT", "结账", "Webhook", "XPayLabs"]
+---
+
+通过 XPayLabs 接受稳定币支付：创建收款订单，向客户展示结账页面，并通过 Webhook 确认支付。TRON 交易约 3 秒确认；EVM 链约 12-15 秒确认。
+
+## 加密支付流程
+
+1. 您的服务器通过 API 创建收款订单。
+2. 网关返回唯一的充值地址和结账 URL。
+3. 您的客户将 USDT（或其他支持的代币）发送到充值地址。
+4. 区块链扫描器检测到交易。
+5. 支付确认后，网关向您的服务器发送 Webhook。
+
+---
+
+## 步骤 1：创建收款订单
+
+调用 `POST /v1/order/createCollection` 并传入支付详情：
+
+```javascript
+import crypto from "crypto";
+
+const GATEWAY_URL = "http://your-gateway:3010";
+const MERCHANT_TOKEN = process.env.XPAYLABS_TOKEN;
+
+function signRequest(data) {
+  return crypto
+    .createHmac("sha256", MERCHANT_TOKEN)
+    .update(JSON.stringify(data), "utf8")
+    .digest("hex");
+}
+
+async function createCollection(amount, orderId) {
+  const data = {
+    amount: amount,
+    symbol: "USDT",
+    chain: "TRON",
+    orderId: orderId,
+  };
+
+  const payload = {
+    sign: signRequest(data),
+    timestamp: Math.floor(Date.now() / 1000),
+    nonce: crypto.randomUUID(),
+    data,
+  };
+
+  const response = await fetch(`${GATEWAY_URL}/v1/order/createCollection`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  const result = await response.json();
+  if (result.code !== 200) throw new Error(result.msg);
+
+  return result.data;
+}
+
+const payment = await createCollection("100.00", "order_1042");
+console.log(`发送 USDT 到: ${payment.address}`);
+console.log(`结账页面: ${payment.paymentUrl}`);
+```
+
+### 响应
+
+```json
+{
+  "code": 200,
+  "msg": "success",
+  "data": {
+    "address": "TWkKZkmuB8DpVeiMoHiKf99ZoFHzk73CqR",
+    "amount": "100.00",
+    "symbol": "USDT",
+    "chain": "TRON",
+    "orderId": "order_1042",
+    "expiredTime": 1717086400,
+    "paymentUrl": "http://your-gateway:3010/checkout?orderId=order_1042"
+  }
+}
+```
+
+---
+
+## 步骤 2：向客户呈现支付信息
+
+将客户引导至 `paymentUrl`——一个显示充值地址、二维码和支付说明的托管结账页面。或者将地址直接嵌入您自己的界面：
+
+```html
+<div class="payment-info">
+  <p>在 TRON 上发送 <strong>100 USDT</strong> 到：</p>
+  <code>TWkKZkmuB8DpVeiMoHiKf99ZoFHzk73CqR</code>
+  <p>过期时间：<span id="countdown"></span></p>
+  <img src="https://chart.googleapis.com/chart?chs=250x250&cht=qr&chl=TWkKZkmuB8DpVeiMoHiKf99ZoFHzk73CqR" />
+</div>
+```
+
+---
+
+## 步骤 3：处理 Webhook 通知
+
+在网关中配置您的回调 URL。当检测并确认支付后，网关会发送一个已签名的 `POST` 请求：
+
+```javascript
+const express = require("express");
+const crypto = require("crypto");
+
+const app = express();
+app.use(express.json());
+
+const WEBHOOK_SECRET = process.env.XPAYLABS_WEBHOOK_SECRET;
+
+app.post("/webhooks/xpaylabs", (req, res) => {
+  const payload = req.body;
+
+  // 验证签名
+  const dataJson = JSON.stringify(payload.data);
+  const expectedSign = crypto
+    .createHmac("sha256", WEBHOOK_SECRET)
+    .update(dataJson, "utf8")
+    .digest("hex");
+
+  if (expectedSign !== payload.sign) {
+    return res.status(400).send("无效签名");
+  }
+
+  // 按事件类型路由
+  switch (payload.notifyType) {
+    case "ORDER_PENDING":
+      console.log("订单已创建，等待支付");
+      break;
+
+    case "ORDER_PENDING_CONFIRMATION":
+      console.log("检测到支付，等待确认");
+      break;
+
+    case "ORDER_SUCCESS":
+      console.log(`订单 ${payload.data.orderId} 支付已确认`);
+      break;
+
+    case "ORDER_EXPIRED":
+      console.log(`订单 ${payload.data.orderId} 已过期`);
+      break;
+  }
+
+  res.status(200).send("ok");
+});
+
+app.listen(3000);
+```
+
+---
+
+## 步骤 4：轮询订单状态（Webhook 的替代方案）
+
+如果无法接收 Webhook，可轮询状态端点：
+
+```javascript
+async function getOrderStatus(orderId, token) {
+  const sign = crypto
+    .createHmac("sha256", token)
+    .update(orderId, "utf8")
+    .digest("hex");
+
+  const response = await fetch(
+    `http://your-gateway:3010/v1/order/getOrderStatus?orderId=${orderId}&sign=${sign}`
+  );
+  const result = await response.json();
+  return result.data.status;
+}
+
+// 每 3 秒轮询一次，直到确认或过期
+async function waitForPayment(orderId, token) {
+  return new Promise((resolve) => {
+    const interval = setInterval(async () => {
+      const status = await getOrderStatus(orderId, token);
+      if (status === "SUCCESS") {
+        clearInterval(interval);
+        resolve(true);
+      } else if (status === "EXPIRED" || status === "FAILED") {
+        clearInterval(interval);
+        resolve(false);
+      }
+    }, 3000);
+  });
+}
+```
+
+---
+
+## 支持的链
+
+创建收款时，指定 `chain` 参数：
+
+| 链 | 值 | 代币 |
+|---|---|---|
+| TRON | `TRON` | USDT (TRC20)、USDC |
+| Ethereum | `ETH` | USDT (ERC20)、USDC、DAI |
+| BNB Chain | `BSC` | USDT (BEP20)、USDC、BUSD |
+| Polygon | `POLYGON` | USDT、USDC、DAI |
+| Avalanche | `AVAX_C_CHAIN` | USDT、USDC |
+| SUI | `SUI` | USDC |
+
+<Tip>
+  开发期间，请使用测试网（例如 `TRON_TEST` 对应 Shasta，`ETH_SEPOLIA` 对应 Sepolia）以避免真实的 gas 费用。详情请参阅[测试指南](/zh/guides/testing)。
+</Tip>

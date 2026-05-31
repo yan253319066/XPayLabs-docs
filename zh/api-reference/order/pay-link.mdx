@@ -1,0 +1,92 @@
+---
+title: "获取支付链接详情 | GET /v1/order/pay"
+sidebarTitle: "支付链接"
+description: "获取收款订单的结账详情，包括充值地址、金额和当前状态。用于面向客户的结账页面渲染。"
+keywords: ["支付链接", "结账", "订单详情", "GET", "API", "XPayLabs"]
+---
+
+返回收款订单的结账详情。此端点是托管结账页面用于渲染支付说明所使用的，但您也可以直接调用它以获取面向客户界面的订单信息。
+
+## 请求
+
+**`GET http://your-gateway:3010/v1/order/pay?orderId={orderId}&sign={sign}`**
+
+### 查询参数
+
+<ParamField query="orderId" type="string" required>
+  订单标识符。
+</ParamField>
+
+<ParamField query="sign" type="string" required>
+  基于 `orderId` 值计算的 HMAC-SHA256 签名。
+</ParamField>
+
+### cURL
+
+```bash
+curl "http://your-gateway:3010/v1/order/pay?orderId=order_1042&sign=a1b2c3d4e5f6..."
+```
+
+---
+
+## 响应
+
+成功的请求返回 HTTP `200`，带 `R<PayinOrderVo>` 信封。
+
+### PayinOrderVo 对象
+
+<ResponseField name="orderId" type="string">
+  订单标识符。
+</ResponseField>
+
+<ResponseField name="chain" type="string">
+  此支付的区块链网络。
+</ResponseField>
+
+<ResponseField name="symbol" type="string">
+  代币符号。
+</ResponseField>
+
+<ResponseField name="address" type="string">
+  客户应发送资金的充值地址。
+</ResponseField>
+
+<ResponseField name="amount" type="string">
+  请求的金额，十进制字符串格式。
+</ResponseField>
+
+<ResponseField name="actualAmount" type="string">
+  支付确认后实际收到的金额。支付前为 `null`。
+</ResponseField>
+
+<ResponseField name="expiredTime" type="integer">
+  此支付请求过期的 Unix 时间戳。
+</ResponseField>
+
+<ResponseField name="status" type="string">
+  当前订单状态。可能的值请参见[订单状态](/zh/api-reference/order/status)。
+</ResponseField>
+
+<ResponseField name="reason" type="string | null">
+  失败或过期原因。如果订单仍然有效则为 `null`。
+</ResponseField>
+
+### 示例响应
+
+```json
+{
+  "code": 200,
+  "msg": "success",
+  "data": {
+    "orderId": "order_1042",
+    "chain": "TRON",
+    "symbol": "USDT",
+    "address": "TWkKZkmuB8DpVeiMoHiKf99ZoFHzk73CqR",
+    "amount": "250.00",
+    "actualAmount": null,
+    "expiredTime": 1717086400,
+    "status": "PENDING",
+    "reason": null
+  }
+}
+```

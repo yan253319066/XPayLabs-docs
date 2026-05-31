@@ -1,0 +1,135 @@
+---
+title: "HMAC-SHA256：XPayLabs API 身份认证参考"
+sidebarTitle: "身份认证"
+description: "计算 HMAC-SHA256 签名以验证 XPayLabs API 请求的完整参考，包括签名算法和每个请求字段。"
+keywords: ["HMAC-SHA256", "签名", "身份认证", "API", "参考", "XPayLabs"]
+---
+
+每个对 XPayLabs 的 API 请求都必须包含一个加密签名。本页详细说明确切的签名算法、每个字段的用途以及常见陷阱。
+
+## 签名算法
+
+`sign` 字段按如下方式计算：
+
+```
+sign = HEX(HMAC-SHA256(JSON.stringify(data), merchant_token))
+```
+
+其中：
+- `data` 是请求体负载（`ReqPayload` 的 `data` 字段）
+- `merchant_token` 是您配置的密钥令牌
+- `HMAC-SHA256` 产生二进制摘要
+- `HEX` 将其转换为小写十六进制字符串（64 个字符）
+
+## 重要：JSON 序列化
+
+`data` 对象必须序列化为 JSON **且不含多余空格**。不同的 JSON 库可能产生不同的输出：
+
+| 库 | 输出 | 有效？ |
+|---|---|---|
+| `JSON.stringify(obj)` | `{"amount":"100.00","symbol":"USDT","chain":"TRON"}` | 是 |
+| `json.dumps(obj, separators=(",",":"))` | `{"amount":"100.00","symbol":"USDT","chain":"TRON"}` | 是 |
+| `json.dumps(obj, indent=2)` | 格式化后的带空格/换行 | 否 |
+
+<Warning>
+  签名仅基于 `data` 字段计算——而非完整的 `ReqPayload` 信封。`sign`、`timestamp` 和 `nonce` 字段不参与签名。
+</Warning>
+
+## 请求信封
+
+每个请求必须包含以下四个字段作为 JSON 对象：
+
+```json
+{
+  "sign": "a1b2c3d4e5f6...",
+  "timestamp": 1717000000,
+  "nonce": "550e8400-e29b-41d4-a716-446655440000",
+  "data": {
+    "amount": "100.00",
+    "symbol": "USDT",
+    "chain": "TRON"
+  }
+}
+```
+
+## 语言示例
+
+### Node.js
+
+```javascript
+import crypto from "crypto";
+
+function signRequest(data, token) {
+  return crypto
+    .createHmac("sha256", token)
+    .update(JSON.stringify(data), "utf8")
+    .digest("hex");
+}
+```
+
+### Python
+
+```python
+import hmac, hashlib, json
+
+def sign_request(data: dict, token: str) -> str:
+    json_str = json.dumps(data, separators=(",", ":"), sort_keys=True)
+    return hmac.new(token.encode(), json_str.encode(), hashlib.sha256).hexdigest()
+```
+
+### Java
+
+```java
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import java.security.MessageDigest;
+
+public static String signRequest(String dataJson, String token) throws Exception {
+    Mac mac = Mac.getInstance("HmacSHA256");
+    mac.init(new SecretKeySpec(token.getBytes("UTF-8"), "HmacSHA256"));
+    byte[] digest = mac.doFinal(dataJson.getBytes("UTF-8"));
+    return bytesToHex(digest);
+}
+```
+
+### Go
+
+```go
+import (
+    "crypto/hmac"
+    "crypto/sha256"
+    "encoding/hex"
+    "encoding/json"
+)
+
+func SignRequest(data interface{}, token string) string {
+    jsonBytes, _ := json.Marshal(data)  // compact JSON
+    mac := hmac.New(sha256.New, []byte(token))
+    mac.Write(jsonBytes)
+    return hex.EncodeToString(mac.Sum(nil))
+}
+```
+
+## 验证
+
+XPayLabs 通过以下方式验证每个请求：
+1. 从 `data` 字段和您存储的商家令牌重新计算 HMAC-SHA256 签名。
+2. 检查计算出的签名是否与提供的 `sign` 值匹配。
+3. 验证 `timestamp` 是否在服务器时钟的 5 分钟以内。
+4. 确保 `nonce` 之前未被使用过。
+
+如果任何检查失败，网关返回 `401 Unauthorized` 响应：
+```json
+{
+  "code": 401,
+  "msg": "Sign verification failed",
+  "data": null
+}
+```
+
+## GET 请求签名
+
+对于需要身份认证的 `GET` 请求（例如 `/v1/order/status/{orderId}`、`/v1/order/pay`、`/v1/order/getOrderStatus`），`sign` 参数作为查询字符串值传递。签名基于相关参数（通常为 `orderId`）计算：
+```
+sign = HEX(HMAC-SHA256(orderId, merchant_token))
+```

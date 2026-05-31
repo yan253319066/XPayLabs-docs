@@ -1,0 +1,186 @@
+---
+title: "XPayLabs Webhook 事件类型 — 完整参考"
+sidebarTitle: "事件类型"
+description: "所有 XPayLabs Webhook 事件类型的完整参考——订单事件（PENDING、SUCCESS、EXPIRED、FAILED）和收款事件（PENDING、SUCCESS、FAILED）。"
+keywords: ["Webhook", "事件类型", "通知", "订单事件", "收款事件", "XPayLabs"]
+---
+
+XPayLabs 根据 `NotifyType` 枚举发送 Webhook 通知。每个通知对应订单或收款归集的状态变化。
+
+## 事件类型
+
+| 事件类型 | 触发时机 | 负载 |
+|---|---|---|
+| `ORDER_PENDING` | 新订单已创建，等待客户支付 | NotifyOrder |
+| `ORDER_PENDING_CONFIRMATION` | 检测到区块链交易，等待确认 | NotifyOrder |
+| `ORDER_SUCCESS` | 支付已确认，订单成功完成 | NotifyOrder |
+| `ORDER_EXPIRED` | 订单在收到支付前过期 | NotifyOrder |
+| `ORDER_FAILED` | 支付交易失败 | NotifyOrder |
+| `COLLECT_PENDING` | 归集已发起 | NotifyCollect |
+| `COLLECT_SUCCESS` | 归集成功完成 | NotifyCollect |
+| `COLLECT_FAILED` | 归集失败 | NotifyCollect |
+
+---
+
+## 订单事件（`ORDER_*`）
+
+### `ORDER_PENDING`
+
+当收款或付款订单创建完毕，正在等待下一步操作时发送。
+
+```json
+{
+  "sign": "a1b2c3d4e5f6...",
+  "timestamp": 1717000000,
+  "nonce": "nonce_001",
+  "notifyType": "ORDER_PENDING",
+  "data": {
+    "orderId": "order_1042",
+    "uid": "user_42",
+    "orderType": "COLLECTION",
+    "status": "PENDING",
+    "reason": null,
+    "amount": "250.00",
+    "actualAmount": null,
+    "fee": "0.00",
+    "transaction": null
+  }
+}
+```
+
+### `ORDER_PENDING_CONFIRMATION`
+
+当检测到区块链交易但尚未达到所需区块确认数时发送。
+
+```json
+{
+  "sign": "a1b2c3d4e5f6...",
+  "timestamp": 1717000050,
+  "nonce": "nonce_002",
+  "notifyType": "ORDER_PENDING_CONFIRMATION",
+  "data": {
+    "orderId": "order_1042",
+    "orderType": "COLLECTION",
+    "status": "PENDING_CONFIRMATION",
+    "amount": "250.00",
+    "actualAmount": "250.00",
+    "fee": "0.00",
+    "transaction": {
+      "chain": "TRON",
+      "symbol": "USDT",
+      "txid": "a1b2c3d4e5f6...",
+      "from": "TXyz...",
+      "to": "TWkKZkmuB8DpVeiMoHiKf99ZoFHzk73CqR",
+      "amount": "250.00",
+      "blockNum": 12345678,
+      "confirmedNum": 1,
+      "status": "PENDING",
+      "timestamp": 1717000045
+    }
+  }
+}
+```
+
+### `ORDER_SUCCESS`
+
+当支付完全确认或付款成功完成时发送。
+
+```json
+{
+  "sign": "a1b2c3d4e5f6...",
+  "timestamp": 1717000100,
+  "nonce": "nonce_003",
+  "notifyType": "ORDER_SUCCESS",
+  "data": {
+    "orderId": "order_1042",
+    "orderType": "COLLECTION",
+    "status": "SUCCESS",
+    "amount": "250.00",
+    "actualAmount": "250.00",
+    "fee": "0.00",
+    "transaction": {
+      "chain": "TRON",
+      "symbol": "USDT",
+      "txid": "a1b2c3d4e5f6...",
+      "from": "TXyz...",
+      "to": "TWkKZkmuB8DpVeiMoHiKf99ZoFHzk73CqR",
+      "amount": "250.00",
+      "confirmedNum": 19,
+      "status": "SUCCESS",
+      "timestamp": 1717000045
+    }
+  }
+}
+```
+
+### `ORDER_EXPIRED`
+
+当订单在收到支付之前达到过期时间时发送。
+
+```json
+{
+  "sign": "a1b2c3d4e5f6...",
+  "timestamp": 1717086401,
+  "nonce": "nonce_004",
+  "notifyType": "ORDER_EXPIRED",
+  "data": {
+    "orderId": "order_1042",
+    "orderType": "COLLECTION",
+    "status": "EXPIRED",
+    "reason": "Order expired",
+    "amount": "250.00",
+    "actualAmount": null,
+    "fee": "0.00",
+    "transaction": null
+  }
+}
+```
+
+### `ORDER_FAILED`
+
+当付款交易失败或收款交易被区块链拒绝时发送。
+
+```json
+{
+  "sign": "a1b2c3d4e5f6...",
+  "timestamp": 1717000200,
+  "nonce": "nonce_005",
+  "notifyType": "ORDER_FAILED",
+  "data": {
+    "orderId": "payout_001",
+    "orderType": "PAYOUT",
+    "status": "FAILED",
+    "reason": "Insufficient balance",
+    "amount": "50.00",
+    "actualAmount": "0.00",
+    "fee": "0.00",
+    "transaction": null
+  }
+}
+```
+
+---
+
+## 收款事件（`COLLECT_*`）
+
+收款事件在网关执行自动热转冷钱包归集时发送。这些与订单事件不同——它们涉及网关钱包之间的内部资金移动。
+
+| 事件类型 | 触发时机 |
+|---|---|
+| `COLLECT_PENDING` | 从热钱包到冷钱包的归集已发起 |
+| `COLLECT_SUCCESS` | 归集交易已在链上确认 |
+| `COLLECT_FAILED` | 归集交易失败 |
+
+---
+
+## 最佳实践
+
+1. **快速返回 `200`。** 立即返回 `200 OK`，在后台工作器中异步处理事件。
+
+2. **验证签名。** 在处理任何事件之前，始终使用您的 `webhook-secret` 验证 `sign` 字段。
+
+3. **使用 `nonce` 去重。** 同一事件可能被投递多次。在数据库中存储已处理的 nonce 并跳过重复项。
+
+4. **先检查 `notifyType`。** 根据事件类型路由到不同的处理器。
+
+5. **处理 `ORDER_PENDING_CONFIRMATION`。** 在交易完全确认之前，使用此事件在 UI 中显示"检测到支付"。

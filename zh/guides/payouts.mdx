@@ -1,0 +1,139 @@
+---
+title: "发送加密付款：XPayLabs 付款 API 指南"
+sidebarTitle: "付款"
+description: "使用 XPayLabs 付款 API 从您的网关钱包向外部区块链地址发送加密支付。支持 TRON、EVM 链和 SUI。"
+keywords: ["付款", "发送", "USDT", "转账", "API", "XPayLabs"]
+---
+
+使用付款 API 从您的 XPayLabs 网关钱包向任何外部区块链地址发送加密支付。支持 TRON、EVM 链和 SUI 上的 USDT、USDC 及其他稳定币。
+
+## 如何创建付款
+
+调用 `POST /v1/order/createPayout`，传入目标地址、金额、代币符号和链信息：
+
+```javascript
+import crypto from "crypto";
+
+const GATEWAY_URL = "http://your-gateway:3010";
+const MERCHANT_TOKEN = process.env.XPAYLABS_TOKEN;
+
+function signRequest(data) {
+  return crypto
+    .createHmac("sha256", MERCHANT_TOKEN)
+    .update(JSON.stringify(data), "utf8")
+    .digest("hex");
+}
+
+async function createPayout({ amount, symbol, chain, receiveAddress, orderId }) {
+  const data = { amount, symbol, chain, receiveAddress, orderId };
+
+  const payload = {
+    sign: signRequest(data),
+    timestamp: Math.floor(Date.now() / 1000),
+    nonce: crypto.randomUUID(),
+    data,
+  };
+
+  const response = await fetch(`${GATEWAY_URL}/v1/order/createPayout`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  const result = await response.json();
+  if (result.code !== 200) throw new Error(result.msg);
+
+  return result.data;
+}
+
+// 在 TRON 上向外部地址发送 50 USDT
+const payout = await createPayout({
+  amount: "50.00",
+  symbol: "USDT",
+  chain: "TRON",
+  receiveAddress: "TYourExternalAddress...",
+  orderId: "payout_001",
+});
+
+console.log(`付款已创建: ${payout.orderId}`);
+```
+
+### 请求参数
+
+| 参数 | 必填 | 描述 |
+|---|---|---|
+| `amount` | 是 | 十进制字符串格式的金额（例如 `"50.00"`） |
+| `symbol` | 是 | 代币符号（例如 `"USDT"`） |
+| `chain` | 是 | 区块链网络 |
+| `receiveAddress` | 是 | 目标区块链地址 |
+| `orderId` | 否 | 此付款的标识符 |
+| `uid` | 否 | 您的用户标识符 |
+
+### 地址验证
+
+网关在处理前会验证 `receiveAddress` 的格式是否与指定链匹配：
+
+| 链 | 地址格式 | 示例 |
+|---|---|---|
+| TRON | Base58，以 `T` 开头 | `TWkKZkmuB8DpVeiMoHiKf99ZoFHzk73CqR` |
+| EVM（ETH、BSC、POLYGON） | 十六进制，以 `0x` 开头 | `0x05E833cF6a895a9ABe408FD6a8d5e0d3DB2Fec5A` |
+| SUI | 十六进制，以 `0x` 开头 | `0x24f672b38299ae651f7598f4994ade780c38aeffa4e595c79ab73d3d176543cd` |
+
+如果地址格式无效，API 返回 `"ReceiveAddress error"`。
+
+---
+
+## 如何跟踪付款状态
+
+创建付款后，使用订单状态端点跟踪其状态：
+
+```javascript
+async function getPayoutStatus(orderId, token) {
+  const response = await fetch(
+    `${GATEWAY_URL}/v1/order/status/${orderId}`,
+    { headers: { "Content-Type": "application/json" } }
+  );
+  const result = await response.json();
+  return result.data;
+}
+
+// 轮询直到完成
+const status = await getPayoutStatus("payout_001");
+console.log(status.status); // "PENDING", "PENDING_CONFIRMATION", "SUCCESS", "FAILED"
+if (status.transaction) {
+  console.log(`TxID: ${status.transaction.txid}`);
+}
+```
+
+## 有哪些付款状态？
+
+| 状态 | 描述 |
+|---|---|
+| `PENDING` | 付款已创建，等待处理 |
+| `PENDING_CONFIRMATION` | 交易已提交到区块链 |
+| `SUCCESS` | 付款已在链上确认 |
+| `FAILED` | 付款失败（余额不足等） |
+
+---
+
+## 付款会触发哪些 Webhook 事件？
+
+付款同样会触发 Webhook 事件：
+
+| 事件 | 触发时机 |
+|---|---|
+| `ORDER_PENDING` | 付款订单已创建 |
+| `ORDER_PENDING_CONFIRMATION` | 交易已提交 |
+| `ORDER_SUCCESS` | 付款已在链上确认 |
+| `ORDER_FAILED` | 付款失败 |
+
+---
+
+## 重要安全说明
+
+<Warning>
+  - 区块链交易不可逆转。提交前请仔细检查 `receiveAddress`。
+  - 网关验证地址格式，但无法验证地址是否属于预期的接收者。
+  - 付款消耗区块链 gas 费用（TRON 消耗 TRX，EVM 链消耗 ETH gas）。
+  - 发起付款前，请确保您的热钱包有足够余额（包括 gas 代币）。
+</Warning>

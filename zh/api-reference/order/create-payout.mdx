@@ -1,0 +1,134 @@
+---
+title: "创建付款订单 | POST /v1/order/createPayout"
+sidebarTitle: "创建付款"
+description: "从您的网关钱包向外部区块链地址发起付款。需要为指定链提供有效的收款地址。"
+keywords: ["创建付款", "付款订单", "发送资金", "POST", "API", "XPayLabs"]
+---
+
+创建一个新的付款订单，从您的网关管理的钱包向外部区块链地址发送资金。网关在处理前会验证收款地址的格式是否与指定链匹配。
+
+## 请求
+
+**`POST http://your-gateway:3010/v1/order/createPayout`**
+
+### 请求头
+
+| 头部 | 值 |
+|---|---|
+| `Content-Type` | `application/json` |
+
+### 请求体参数（`data` 字段）
+
+<ParamField body="amount" type="string" required>
+  付款金额，十进制字符串格式，例如 `"50.00"`。必须大于零。
+</ParamField>
+
+<ParamField body="symbol" type="string" required>
+  要发送的代币符号，例如 `"USDT"`。必须是指定链上支持的代币。
+</ParamField>
+
+<ParamField body="chain" type="string" required>
+  付款的区块链网络。必须与收款地址的网络匹配：
+  - `TRON` — TRC20
+  - `ETH` — ERC20
+  - `BSC` — BEP20
+  - `POLYGON` — Polygon
+  - `AVAX_C_CHAIN` — Avalanche
+  - `SUI` — SUI Network
+</ParamField>
+
+<ParamField body="receiveAddress" type="string" required>
+  目标区块链地址。网关会验证地址格式是否与指定链匹配。示例：TRON 地址 `"TWkKZkmuB8DpVeiMoHiKf99ZoFHzk73CqR"` 或 EVM 地址 `"0x..."`。
+</ParamField>
+
+<ParamField body="orderId" type="string" optional>
+  您的唯一订单标识符。V3 商家必填。
+</ParamField>
+
+<ParamField body="uid" type="string" optional>
+  您的内部用户标识符。V2 商家必填。不能为 `"0"`。
+</ParamField>
+
+### cURL
+
+```bash
+curl -X POST http://your-gateway:3010/v1/order/createPayout \
+  -H "Content-Type: application/json" \
+  -d '{
+    "sign": "a1b2c3d4e5f6...",
+    "timestamp": 1717000000,
+    "nonce": "550e8400-e29b-41d4-a716-446655440000",
+    "data": {
+      "amount": "50.00",
+      "symbol": "USDT",
+      "chain": "TRON",
+      "receiveAddress": "TWkKZkmuB8DpVeiMoHiKf99ZoFHzk73CqR",
+      "orderId": "payout_001"
+    }
+  }'
+```
+
+---
+
+## 响应
+
+成功的请求返回 HTTP `200`，带 `R<PaymentAddress>` 信封。
+
+### PaymentAddress 对象
+
+<ResponseField name="address" type="string">
+  付款的源地址。
+</ResponseField>
+
+<ResponseField name="amount" type="string">
+  付款金额，与请求金额一致。
+</ResponseField>
+
+<ResponseField name="symbol" type="string">
+  代币符号。
+</ResponseField>
+
+<ResponseField name="chain" type="string">
+  区块链网络。
+</ResponseField>
+
+<ResponseField name="orderId" type="string">
+  您的订单标识符，从请求中原样返回。
+</ResponseField>
+
+<ResponseField name="expiredTime" type="integer">
+  此付款请求过期的 Unix 时间戳。
+</ResponseField>
+
+### 示例响应
+
+```json
+{
+  "code": 200,
+  "msg": "success",
+  "data": {
+    "address": "TWkKZkmuB8DpVeiMoHiKf99ZoFHzk73CqR",
+    "amount": "50.00",
+    "symbol": "USDT",
+    "chain": "TRON",
+    "orderId": "payout_001",
+    "expiredTime": 1717086400
+  }
+}
+```
+
+---
+
+## 错误响应
+
+| 码 | 消息 | 原因 |
+|---|---|---|
+| `400` | `"The receiveAddress cannot be left blank."` | `receiveAddress` 缺失或为空 |
+| `400` | `"ReceiveAddress error"` | 地址格式对指定链无效 |
+| `400` | `"The amount cannot be left blank."` | `amount` 缺失 |
+| `400` | `"The symbol cannot be left blank."` | `symbol` 缺失 |
+| `400` | `"The chain cannot be left blank."` | `chain` 缺失 |
+
+<Warning>
+  付款会从您的网关钱包中转移真实资金。在提交付款请求前，请始终验证收款地址。区块链交易不可逆转。
+</Warning>

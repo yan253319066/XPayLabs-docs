@@ -1,0 +1,150 @@
+---
+title: "HMAC-SHA256 身份认证：XPayLabs API 安全"
+sidebarTitle: "身份认证"
+description: "XPayLabs 使用 HMAC-SHA256 请求签名对每个 API 请求进行身份验证。使用您的商家令牌计算签名字段以确保加密支付 API 调用的安全。"
+keywords: ["HMAC-SHA256", "身份认证", "API 安全", "签名", "商家令牌", "XPayLabs"]
+---
+
+XPayLabs 使用 HMAC-SHA256 请求签名对每个 API 请求进行身份验证。与传统的 Bearer 令牌身份认证不同，XPayLabs 要求每个请求都包含一个基于请求负载计算的加密签名。这确保了请求的完整性并防止重放攻击。
+
+---
+
+## HMAC-SHA256 签名格式
+
+每个 API 请求都包含一个包含四个字段的 `ReqPayload` 包装：
+
+| 字段 | 类型 | 描述 |
+|---|---|---|
+| `sign` | string | `data` 对象 JSON 字符串的 HMAC-SHA256 签名 |
+| `timestamp` | integer | 请求创建时的 Unix 时间戳（秒） |
+| `nonce` | string | 唯一随机字符串，绝不重复使用 |
+| `data` | object | 实际的请求负载 |
+
+`sign` 字段使用您的商家令牌作为 HMAC 密钥进行计算。
+
+---
+
+## 如何计算 HMAC 签名
+
+### 算法
+
+1. 将 `data` 对象序列化为 JSON 字符串（无格式化、无多余空格）。
+2. 计算 `HMAC-SHA256(data_json, merchant_token)`。
+3. 将结果转换为小写十六进制字符串。
+4. 将此值设置为 `sign` 字段。
+
+### Node.js
+
+```javascript
+import crypto from "crypto";
+
+const MERCHANT_TOKEN = process.env.XPAYLABS_MERCHANT_TOKEN;
+
+function signRequest(data) {
+  const json = JSON.stringify(data);   // 紧凑 JSON，无多余空格
+  return crypto
+    .createHmac("sha256", MERCHANT_TOKEN)
+    .update(json, "utf8")
+    .digest("hex");
+}
+
+const request = {
+  sign: signRequest({ amount: "100.00", symbol: "USDT", chain: "TRON" }),
+  timestamp: Math.floor(Date.now() / 1000),
+  nonce: crypto.randomUUID(),
+  data: { amount: "100.00", symbol: "USDT", chain: "TRON" },
+};
+```
+
+### Python
+
+```python
+import hmac
+import hashlib
+import json
+import time
+import uuid
+
+MERCHANT_TOKEN = "your-merchant-token"
+
+def sign_request(data: dict) -> str:
+    json_str = json.dumps(data, separators=(",", ":"))  # 紧凑 JSON
+    return hmac.new(
+        MERCHANT_TOKEN.encode("utf-8"),
+        json_str.encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+
+request = {
+    "sign": sign_request({"amount": "100.00", "symbol": "USDT", "chain": "TRON"}),
+    "timestamp": int(time.time()),
+    "nonce": str(uuid.uuid4()),
+    "data": {"amount": "100.00", "symbol": "USDT", "chain": "TRON"},
+}
+```
+
+### Go
+
+```go
+package main
+
+import (
+    "crypto/hmac"
+    "crypto/sha256"
+    "encoding/hex"
+    "encoding/json"
+    "fmt"
+    "time"
+    "github.com/google/uuid"
+)
+
+func signRequest(data interface{}, token string) string {
+    jsonBytes, _ := json.Marshal(data)
+    mac := hmac.New(sha256.New, []byte(token))
+    mac.Write(jsonBytes)
+    return hex.EncodeToString(mac.Sum(nil))
+}
+
+func main() {
+    data := map[string]interface{}{
+        "amount":  "100.00",
+        "symbol":  "USDT",
+        "chain":   "TRON",
+    }
+    request := map[string]interface{}{
+        "sign":      signRequest(data, "your-merchant-token"),
+        "timestamp": time.Now().Unix(),
+        "nonce":     uuid.New().String(),
+        "data":      data,
+    }
+    fmt.Printf("%+v\n", request)
+}
+```
+
+<Warning>
+  JSON 序列化**必须是紧凑格式**——键值对之间无空格、无换行。不同的 JSON 序列化库可能产生不同的输出；始终针对一个已知可用的示例测试您的签名计算。
+</Warning>
+
+---
+
+## 时间戳和 nonce 要求
+
+`timestamp` 和 `nonce` 字段用于防止重放攻击：
+
+- **时间戳**：您的服务器时钟必须在 XPayLabs 服务器时间的 **5 分钟** 以内。超过 5 分钟的请求将被拒绝。
+- **Nonce**：每个请求必须使用唯一的 nonce。XPayLabs 会跟踪已使用的 nonce 并拒绝重复。UUID 或加密随机字符串效果良好。
+
+---
+
+## XPayLabs 如何验证服务器端签名？
+
+XPayLabs 通过使用您存储的商家令牌重新计算 HMAC-SHA256 签名来验证每个请求。如果签名不匹配，或者时间戳超出容差范围，请求将被拒绝并返回 `401 Unauthorized` 响应。
+
+---
+
+## 如何保护您的商家令牌安全
+
+- 将商家令牌存储在环境变量或密钥管理器中。
+- 切勿在源代码或客户端应用程序中硬编码令牌。
+- 定期轮换令牌并更新配置。
+- 令牌是您的商家服务器与 XPayLabs 网关之间的共享密钥。它不会在 API 请求中通过网络发送。

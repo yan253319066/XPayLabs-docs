@@ -1,0 +1,109 @@
+---
+title: "XPayLabs API 错误：代码、原因和解决方案"
+sidebarTitle: "错误"
+description: "XPayLabs 返回带有 HTTP 状态码和验证错误消息的结构化错误响应。通过我们的故障排除指南优雅地处理区块链支付错误。"
+keywords: ["错误", "错误代码", "API 错误", "验证", "状态码", "XPayLabs"]
+---
+
+XPayLabs 使用标准的 `R<T>` 信封返回错误，带有与 HTTP 兼容的 `code` 和人类可读的 `msg`。与传统的支付处理器不同，XPayLabs 错误主要是验证和身份认证错误——由于区块链交易是最终性的，API 层面没有"卡被拒绝"或"余额不足"错误（这些属于区块链层面的问题）。
+
+## 错误响应格式
+
+```json
+{
+  "code": 400,
+  "msg": "The amount cannot be left blank.",
+  "data": null
+}
+```
+
+| 字段 | 类型 | 描述 |
+|---|---|---|
+| `code` | integer | 与 HTTP 兼容的状态码 |
+| `msg` | string | 人类可读的错误描述 |
+| `data` | null | 错误响应中始终为 `null` |
+
+## 状态码
+
+| 码 | 含义 | 典型原因 |
+|---|---|---|
+| `400` | 错误请求 | 缺少或无效参数 |
+| `401` | 未授权 | HMAC 签名无效或时间戳已过期 |
+| `422` | 不可处理 | 地址格式对该链无效 |
+| `429` | 请求过多 | 超出速率限制 |
+| `500` | 内部错误 | 意外的网关错误 |
+
+## 常见验证错误
+
+### 签名错误 (`401`)
+
+| 消息 | 原因 |
+|---|---|
+| `"The sign cannot be left blank."` | 请求中缺少 `sign` 字段 |
+| `"Sign verification failed"` | HMAC 签名与计算值不匹配 |
+| `"The timestamp cannot be left blank."` | `timestamp` 缺失 |
+| `"The nonce cannot be left blank."` | `nonce` 缺失 |
+
+### 订单错误 (`400`)
+
+| 消息 | 原因 |
+|---|---|
+| `"The amount cannot be left blank."` | 金额缺失或为 null |
+| `"The symbol cannot be left blank."` | 代币符号缺失 |
+| `"The chain cannot be left blank."` | 区块链网络缺失 |
+| `"The receiveAddress cannot be left blank."` | 付款目标地址缺失 |
+| `"ReceiveAddress error"` | 地址格式对指定链无效 |
+| `"The orderId cannot be left blank."` | V3 商家必需 |
+| `"The uid cannot be left blank."` | V2 商家必需 |
+| `"The uid cannot be zero."` | uid 被设置为 `"0"` |
+
+## 在集成中处理错误
+
+```javascript
+async function createCollection(payload) {
+  const response = await fetch("http://your-gateway:3010/v1/order/createCollection", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  const result = await response.json();
+
+  if (result.code !== 200) {
+    switch (result.code) {
+      case 401:
+        // 签名问题——重新计算签名并重试
+        console.error("Auth error:", result.msg);
+        break;
+      case 400:
+        // 验证错误——修复请求参数
+        console.error("Validation error:", result.msg);
+        break;
+      case 429:
+        // 被限速——退避后重试
+        await sleep(1000);
+        return createCollection(payload);
+      default:
+        console.error("Unexpected error:", result.msg);
+    }
+    return null;
+  }
+
+  return result.data;
+}
+```
+
+## 速率限制
+
+XPayLabs 对每个端点实施可配置的速率限制。超出限制会返回 `429` 响应。
+
+默认限制：
+
+| 端点 | 限制 |
+|---|---|
+| `/order/createCollection` | 每 10 秒每 IP 100 次 |
+| `/order/createPayout` | 每 10 秒每 IP 100 次 |
+| `/order/status/{orderId}` | 每 10 秒 1000 次 |
+| `/order/pay` | 每秒每个 orderId 2 次 |
+| `/order/getOrderStatus` | 每秒每个 orderId 2 次 |
+| `/symbol/supportSymbols` | 每 10 秒 50 次 |

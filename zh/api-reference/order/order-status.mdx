@@ -1,0 +1,87 @@
+---
+title: "获取订单状态（简洁版） | GET /v1/order/getOrderStatus"
+sidebarTitle: "简洁订单状态"
+description: "通过 orderId 和 sign 快速获取订单状态。仅返回 PaymentOrderStatus 对象，适用于轻量级轮询。"
+keywords: ["订单状态", "轮询", "GET", "简洁版", "API", "XPayLabs"]
+---
+
+一个轻量级端点，仅返回订单的当前状态。在需要检查支付是否已确认而无需获取完整订单详情的轮询场景中使用。
+
+## 请求
+
+**`GET http://your-gateway:3010/v1/order/getOrderStatus?orderId={orderId}&sign={sign}`**
+
+### 查询参数
+
+<ParamField query="orderId" type="string" required>
+  订单标识符。
+</ParamField>
+
+<ParamField query="sign" type="string" required>
+  基于 `orderId` 值计算的 HMAC-SHA256 签名。
+</ParamField>
+
+### cURL
+
+```bash
+curl "http://your-gateway:3010/v1/order/getOrderStatus?orderId=order_1042&sign=a1b2c3d4e5f6..."
+```
+
+---
+
+## 响应
+
+成功的请求返回 HTTP `200`，带 `R<PaymentOrderStatus>` 信封。
+
+### PaymentOrderStatus 对象
+
+<ResponseField name="status" type="string">
+  当前订单状态：
+  - `INIT` — 等待支付
+  - `PENDING` — 检测到交易
+  - `PENDING_CONFIRMATION` — 等待区块确认
+  - `SUCCESS` — 支付已确认
+  - `EXPIRED` — 订单已过期
+  - `FAILED` — 支付失败
+</ResponseField>
+
+### 示例响应
+
+```json
+{
+  "code": 200,
+  "msg": "success",
+  "data": {
+    "status": "SUCCESS"
+  }
+}
+```
+
+---
+
+## 使用示例
+
+```javascript
+async function waitForPayment(orderId, token) {
+  const sign = computeSign(orderId, token);
+
+  for (let i = 0; i < 120; i++) {
+    const response = await fetch(
+      `http://your-gateway:3010/v1/order/getOrderStatus?orderId=${orderId}&sign=${sign}`
+    );
+    const result = await response.json();
+
+    if (result.data.status === "SUCCESS") {
+      console.log("支付已确认！");
+      return true;
+    }
+    if (result.data.status === "EXPIRED" || result.data.status === "FAILED") {
+      console.log("支付失败或已过期");
+      return false;
+    }
+
+    await new Promise(r => setTimeout(r, 2000));
+  }
+  return false;
+}
+```

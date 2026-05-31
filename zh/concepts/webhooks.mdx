@@ -1,0 +1,70 @@
+---
+title: "Webhook：实时加密支付通知"
+sidebarTitle: "Webhook"
+description: "XPayLabs Webhook 实时投递订单和收款状态变更通知。配置回调 URL 并验证 HMAC 签名以确保安全集成。"
+keywords: ["Webhook", "回调", "通知", "实时", "签名验证", "XPayLabs"]
+---
+
+Webhook 是您的服务器实时了解支付事件的主要方式。无需轮询网关 API，您只需注册一个回调 URL，XPayLabs 就会在订单或收款状态变更时发送已签名的 `POST` 请求。
+
+## Webhook 如何工作？
+
+1. 您在网关配置中设置 `callback-url` 和 `webhook-secret`。
+2. 当事件发生时（例如检测到支付），网关构建一个 `NotifyPayload` 并发送到您的 URL。
+3. 您的服务器验证 HMAC-SHA256 签名并处理事件。
+
+## Webhook 负载格式
+
+每个 Webhook 遵循 `NotifyPayload` 格式：
+
+| 字段 | 类型 | 描述 |
+|---|---|---|
+| `sign` | string | 使用您的 webhook 密钥对 `data` 字段的 HMAC-SHA256 签名 |
+| `timestamp` | integer | 事件的 Unix 时间戳 |
+| `nonce` | string | 用于去重的唯一事件标识符 |
+| `notifyType` | string | 事件类型标识符 |
+| `data` | object | 事件负载（NotifyOrder 或相关对象） |
+
+## 有哪些 Webhook 事件类型？
+
+### 订单事件
+
+| 事件 | 描述 |
+|---|---|
+| `ORDER_PENDING` | 订单已创建，等待支付 |
+| `ORDER_PENDING_CONFIRMATION` | 检测到交易，等待区块确认 |
+| `ORDER_SUCCESS` | 支付已完全确认 |
+| `ORDER_EXPIRED` | 订单过期，未收到支付 |
+| `ORDER_FAILED` | 订单失败 |
+
+### 收款（结算）事件
+
+| 事件 | 描述 |
+|---|---|
+| `COLLECT_PENDING` | 热转冷归集已发起 |
+| `COLLECT_SUCCESS` | 归集成功完成 |
+| `COLLECT_FAILED` | 归集交易失败 |
+
+## 签名验证
+
+每个 Webhook 都包含一个按如下方式计算的 `sign` 字段：
+
+```
+sign = HEX(HMAC-SHA256(JSON.stringify(data), webhook_secret))
+```
+
+您必须在处理任何 Webhook 之前验证此签名。请参阅 [Webhook 参考](/zh/api-reference/webhooks/overview) 获取 Node.js、Python 和其他语言的代码示例。
+
+## 投递保证
+
+- **至少投递一次。** 在极少数情况下，同一事件可能多次到达。使用 `nonce` 字段进行去重。
+- **带退避的重试。** 如果您的端点返回非 `2xx` 状态或超时，XPayLabs 会使用指数退避重试。
+- **顺序性。** 单个订单的事件按顺序投递。不同订单的事件可能乱序到达。
+
+## 最佳实践
+
+1. **始终验证签名。** 在处理 Webhook 之前，务必验证 `sign` 字段。
+2. **快速返回 200。** 立即确认接收，然后异步处理事件。
+3. **使用 `nonce` 去重。** 存储已处理的 nonce 以安全处理重复投递。
+4. **使用 `ORDER_PENDING_CONFIRMATION` 优化用户体验。** 在交易完全确认之前，在 UI 中显示"检测到支付"。
+5. **使用 `ORDER_SUCCESS` 进行履约。** 这是交付商品或服务的信号。

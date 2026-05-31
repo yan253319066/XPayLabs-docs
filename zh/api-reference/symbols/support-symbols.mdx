@@ -1,0 +1,88 @@
+---
+title: "查询支持的代币 | GET /v1/symbol/supportSymbols"
+sidebarTitle: "支持的代币"
+description: "获取您的网关上配置的支持的区块链代币列表。可按链或代币符号过滤。"
+keywords: ["代币", "支持代币", "查询", "GET", "API", "XPayLabs"]
+---
+
+返回您的网关上配置的支持的代币列表。网关管理员配置每条区块链上可用的代币。
+
+## 请求
+
+**`GET http://your-gateway:3010/v1/symbol/supportSymbols`**
+
+### 查询参数
+
+<ParamField query="chain" type="string" optional>
+  按区块链网络过滤。
+</ParamField>
+
+<ParamField query="symbol" type="string" optional>
+  按代币符号过滤。
+</ParamField>
+
+### cURL
+
+```bash
+# 所有支持的代币
+curl http://your-gateway:3010/v1/symbol/supportSymbols
+
+# 按链过滤
+curl "http://your-gateway:3010/v1/symbol/supportSymbols?chain=TRON"
+
+# 按代币符号过滤
+curl "http://your-gateway:3010/v1/symbol/supportSymbols?symbol=USDT"
+```
+
+---
+
+## 响应
+
+成功的请求返回 HTTP `200`，带 `R<List<SupportSymbol>>` 信封。
+
+### SupportSymbol 对象
+
+<ResponseField name="symbol" type="string">
+  代币符号，例如 `"USDT"`、`"USDC"`、`"ETH"`。
+</ResponseField>
+
+<ResponseField name="chain" type="string">
+  区块链网络，例如 `"TRON"`、`"ETH"`、`"BSC"`。
+</ResponseField>
+
+<ResponseField name="contractAddress" type="string | null">
+  此链上的代币合约地址。原生代币为 `null`。
+</ResponseField>
+
+<ResponseField name="decimals" type="integer">
+  此代币的小数位数。例如，ERC20 USDT 为 `6`，TRC20 USDT 为 `6`。
+</ResponseField>
+
+### 示例响应
+
+```json
+{
+  "code": 200,
+  "msg": "success",
+  "data": [
+    {
+      "symbol": "USDT",
+      "chain": "TRON",
+      "contractAddress": "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
+      "decimals": 6
+    },
+    {
+      "symbol": "USDT",
+      "chain": "ETH",
+      "contractAddress": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+      "decimals": 6
+    },
+    {
+      "symbol": "USDC",
+      "chain": "SUI",
+      "contractAddress": null,
+      "decimals": 6
+    }
+  ]
+}
+```

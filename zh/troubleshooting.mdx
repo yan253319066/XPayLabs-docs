@@ -1,0 +1,158 @@
+---
+title: "故障排除：XPayLabs 网关错误解决方案"
+sidebarTitle: "故障排除"
+description: "诊断和修复常见的 XPayLabs 问题——HMAC 签名失败、区块链扫描器问题、Webhook 投递错误、Docker 部署问题和速率限制。"
+keywords: ["故障排除", "错误", "HMAC", "签名", "扫描器", "Webhook", "Docker", "部署", "XPayLabs"]
+---
+
+诊断和解决 XPayLabs 网关部署和 API 集成中的常见问题。本指南涵盖 HMAC 签名错误、区块链扫描器问题、Webhook 投递失败和 Docker 部署问题。
+
+---
+
+## API 问题
+
+### 为什么我收到 401 签名验证失败？
+
+HMAC-SHA256 签名与网关计算的结果不匹配。
+
+**检查清单：**
+
+1. **JSON 序列化**——确保 `data` 对象被序列化为**紧凑 JSON**（无空格、无换行）。JavaScript 中的 `JSON.stringify(obj)` 默认生成正确格式。
+
+2. **数据内容**——签名仅基于 `data` 字段计算，而非完整的请求信封。`sign`、`timestamp` 和 `nonce` 字段被排除在外。
+
+3. **令牌不匹配**——确认用于计算签名的 `MERCHANT_TOKEN` 与网关中配置的令牌匹配。
+
+4. **字符编码**——确保令牌和 JSON 字符串使用 UTF-8 编码。
+
+5. **测试您的签名**——为已知负载计算签名并进行比较：
+
+```javascript
+const crypto = require("crypto");
+const token = "your-merchant-token";
+const data = { amount: "100.00", symbol: "USDT", chain: "TRON" };
+const sign = crypto
+  .createHmac("sha256", token)
+  .update(JSON.stringify(data), "utf8")
+  .digest("hex");
+console.log(sign); // 应当与网关期望的值匹配
+```
+
+### 为什么我收到 400 验证错误？
+
+| 消息 | 可能原因 |
+|---|---|
+| `"The amount cannot be left blank."` | `amount` 为 `null`、`undefined` 或无效数字 |
+| `"The symbol cannot be left blank."` | `symbol` 缺失或为空字符串 |
+| `"The chain cannot be left blank."` | `chain` 缺失或为无效链值 |
+| `"ReceiveAddress error"` | 付款地址格式与指定链不匹配 |
+| `"The uid cannot be left blank."` | 您的商家账户为 V2，需要 `uid` |
+| `"The orderId cannot be left blank."` | 您的商家账户为 V3，需要 `orderId` |
+
+---
+
+## 区块链扫描器问题
+
+## 为什么区块链支付未被检测到？
+
+如果扫描器未检测到传入支付：
+
+1. **检查扫描器日志：** `docker logs <scanner-container-name>`
+2. **验证 RPC 端点：** 确保配置的 RPC URL 可从网关服务器访问。
+3. **检查区块高度：** 扫描器从最后处理的区块开始同步。如果网关刚部署，可能需要时间来追赶。
+4. **确认代币配置：** 验证该链的代币合约地址是否正确配置。
+5. **检查区块链浏览器：** 确认交易确实存在于链上并且发往正确的地址。
+
+### 为什么扫描器速度慢？
+
+- **RPC 速率限制：** 公共 RPC 端点可能会限制高频请求。考虑使用专用 RPC 端点。
+- **出块时间：** 不同链的出块时间不同。TRON 每 3 秒出块，Ethereum 每 12 秒出块。
+- **确认要求：** 在网关设置中配置每条链所需的区块确认数。
+
+---
+
+## Webhook 问题
+
+## 为什么我没有收到 Webhook？
+
+1. **验证回调 URL：** 检查网关配置中的 `callback-url`。
+2. **网络可达性：** 网关必须能够到达您的回调 URL。如果在本地测试，请使用 ngrok 等隧道工具。
+3. **检查网关日志：** `docker logs <core-container-name>` 查看 Webhook 投递尝试。
+4. **检查您的端点日志：** 确保您的服务器正在监听正确的路径并返回 HTTP 200。
+
+### 为什么 Webhook 签名验证失败？
+
+1. **仅验证数据：** 仅对 `data` 字段验证签名，而非完整的 `NotifyPayload`。
+2. **Webhook 密钥不匹配：** 确认用于验证的 `webhook-secret` 与网关中配置的匹配。
+3. **JSON 格式：** `data` 字段必须序列化为紧凑 JSON 才能进行验证。
+
+---
+
+## 部署问题
+
+## 为什么 Docker 容器没有启动？
+
+```bash
+# 检查容器状态
+docker compose ps
+
+# 查看特定服务的日志
+docker compose logs core
+docker compose logs scanner-tron
+```
+
+常见原因：
+- 端口 `3010` 已被占用
+- 磁盘空间不足
+- 配置中缺少环境变量
+
+### 为什么网关没有响应？
+
+1. **确认容器正在运行：** `docker compose ps` 应显示 `Up` 状态。
+2. **检查端口绑定：** `docker compose port core 3010`
+3. **本地测试：** `curl http://localhost:3010/v1/symbol/supportSymbols`
+4. **检查防火墙：** 确保服务器防火墙中已开放 3010 端口。
+
+---
+
+## 速率限制
+
+如果您收到 `429 Too Many Requests`：
+
+| 端点 | 默认限制 |
+|---|---|
+| `POST /order/createCollection` | 每 10 秒 100 次 |
+| `POST /order/createPayout` | 每 10 秒 100 次 |
+| `GET /order/pay` | 每秒每个 orderId 2 次 |
+| `GET /order/getOrderStatus` | 每秒每个 orderId 2 次 |
+
+在您的集成中实现指数退避：
+
+```javascript
+async function fetchWithRetry(url, options, retries = 5) {
+  for (let i = 0; i < retries; i++) {
+    const response = await fetch(url, options);
+    if (response.status !== 429) return response;
+    const delay = Math.pow(2, i) * 1000 + Math.random() * 1000;
+    await new Promise(r => setTimeout(r, delay));
+  }
+  throw new Error("Max retries exceeded");
+}
+```
+
+---
+
+## 获取帮助
+
+如果无法解决问题：
+
+1. 检查容器日志中的错误消息。
+2. 查看[常见问题](/zh/faq)了解常见问题。
+3. 在 [github.com/xpaylabs/gateway](https://github.com/xpaylabs/gateway) 提交 GitHub Issue。
+4. 如需商业支持，请联系 support@xpaylabs.com。
+
+报告问题时请提供：
+- 网关版本和部署方式
+- 相关配置（脱敏处理密钥）
+- 完整的错误消息和日志
+- 复现步骤

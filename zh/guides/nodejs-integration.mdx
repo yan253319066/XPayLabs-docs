@@ -1,0 +1,183 @@
+---
+title: "Node.js + XPayLabs：SDK 加密支付集成"
+sidebarTitle: "Node.js 集成"
+description: "使用 @xpaylabs/node-sdk 将加密支付集成到您的 Node.js 应用程序中。npm 安装、TypeScript 类型、Webhook 验证和完整的 API 示例。"
+keywords: ["Node.js", "SDK", "集成", "npm", "TypeScript", "加密支付", "XPayLabs"]
+---
+
+使用官方 XPayLabs Node.js SDK（`@xpaylabs/node-sdk`）将加密支付集成到您的 Node.js 应用程序中。SDK 为 TypeScript 和 JavaScript 提供类型化的 API 绑定，具有自动 HMAC 签名、Webhook 验证和完整的 TypeScript 类型声明。
+
+## 安装
+
+```bash
+npm install @xpaylabs/node-sdk
+```
+
+SDK 需要 Node.js 14+。
+
+## 配置
+
+```typescript
+import { XPay } from '@xpaylabs/node-sdk';
+
+const xpay = new XPay({
+  apiKey: 'your-merchant-token',
+  apiSecret: 'your-api-secret',
+  baseUrl: 'http://your-gateway:3010',
+  timeout: 30000,
+});
+```
+
+| 选项 | 必填 | 默认值 | 描述 |
+|---|---|---|---|
+| `apiKey` | 是 | — | 商家令牌 |
+| `apiSecret` | 是 | — | 用于 HMAC 签名的 API 密钥 |
+| `baseUrl` | 否 | `https://api.xpaylabs.com` | 网关基础 URL |
+| `timeout` | 否 | `30000` | 请求超时（毫秒） |
+
+## 核心 API 方法
+
+### 创建收款订单
+
+```typescript
+import { XPay } from '@xpaylabs/node-sdk';
+
+const xpay = new XPay({ apiKey: '...', apiSecret: '...', baseUrl: 'http://your-gateway:3010' });
+
+async function createPayment(uid: string, amount: number) {
+  const collection = await xpay.createCollection({
+    amount,
+    symbol: 'USDT',
+    chain: 'TRON',
+    orderId: `order-${Date.now()}`,
+    uid,
+  });
+
+  return collection.data;
+}
+```
+
+### 创建付款
+
+```typescript
+async function sendPayout(uid: string, amount: number, receiveAddress: string) {
+  const payout = await xpay.createPayout({
+    amount,
+    symbol: 'USDT',
+    chain: 'TRON',
+    orderId: `payout-${Date.now()}`,
+    uid,
+    receiveAddress,
+  });
+
+  return payout.data;
+}
+```
+
+### 查询订单状态
+
+```typescript
+async function getStatus(orderId: string) {
+  const order = await xpay.getOrderStatus(orderId);
+  return order.data;
+}
+```
+
+### 获取支持的代币
+
+```typescript
+async function getSymbols() {
+  const symbols = await xpay.getSupportedSymbols();
+  symbols.forEach(s => {
+    console.log(`${s.symbol} on ${s.chain} (decimals: ${s.decimals})`);
+  });
+}
+
+const filtered = await xpay.getSupportedSymbols('TRON', 'USDT');
+```
+
+## 处理 Webhook
+
+使用 Express.js 端点接收和验证 Webhook 回调：
+
+```typescript
+import express from 'express';
+import { XPay } from '@xpaylabs/node-sdk';
+
+const app = express();
+app.use(express.json());
+
+const xpay = new XPay({
+  apiKey: process.env.XPAYLABS_MERCHANT_TOKEN!,
+  apiSecret: process.env.XPAYLABS_API_SECRET!,
+  baseUrl: process.env.XPAYLABS_GATEWAY_URL!,
+});
+
+app.post('/webhook', (req, res) => {
+  const body = JSON.stringify(req.body);
+  const signature = req.body.sign;
+  const timestamp = req.body.timestamp.toString();
+
+  const event = xpay.parseWebhook(body, signature, timestamp);
+
+  if (!event) {
+    return res.status(400).send('无效的 Webhook 签名或时间戳已过期');
+  }
+
+  switch (event.notifyType) {
+    case 'ORDER_SUCCESS':
+      console.log(`订单 ${(event.data as any).orderId} 已完成！`);
+      break;
+
+    case 'ORDER_FAILED':
+      console.log(`订单失败：${(event.data as any).reason}`);
+      break;
+
+    case 'COLLECT_SUCCESS':
+      console.log(`归集完成：${(event.data as any).collectAmount}`);
+      break;
+  }
+
+  res.status(200).send('Webhook received');
+});
+
+app.listen(3000);
+```
+
+## 错误处理
+
+```typescript
+try {
+  const payout = await xpay.createPayout({ /* ... */ });
+} catch (error: any) {
+  console.error(`错误：${error.message}`);
+  console.error(`HTTP 状态：${error.status}`);
+  console.error(`错误码：${error.code}`);
+}
+```
+
+## TypeScript 支持
+
+SDK 附带了完整的类型声明。直接导入类型：
+
+```typescript
+import {
+  XPay,
+  XPayConfig,
+  CollectionRequest,
+  PayoutRequest,
+  CollectionResponse,
+  PayoutResponse,
+  OrderDetails,
+  SupportedSymbol,
+  WebhookEvent,
+  OrderWebhookData,
+  CollectWebhookData,
+  OrderStatus,
+  WebhookNotifyType,
+} from '@xpaylabs/node-sdk';
+```
+
+<Tip>
+  SDK 内部自动处理 HMAC-SHA256 签名——您无需手动计算签名。所有 POST 请求都会自动包装在包含 `sign`、`timestamp` 和 `nonce` 的 `ReqPayload` 信封中。
+</Tip>

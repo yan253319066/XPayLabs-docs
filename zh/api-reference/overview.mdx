@@ -1,0 +1,102 @@
+---
+title: "XPayLabs REST API：加密支付端点参考"
+sidebarTitle: "概述"
+description: "XPayLabs API 是一个使用 HMAC-SHA256 签名保护的 REST API，使用 JSON 请求/响应体。基础 URL、请求格式、响应格式和速率限制。"
+keywords: ["API", "REST", "端点", "请求格式", "响应格式", "速率限制", "XPayLabs"]
+---
+
+XPayLabs 通过 HTTP 暴露 RESTful API。每个请求都使用标准的已签名信封格式（`ReqPayload`），每个响应都遵循一致的结构（`R<T>`）。本页涵盖适用于所有端点的基础概念。
+
+## 基础 URL
+
+所有 API 请求都指向您的自托管网关。默认端口为 `3010`：
+
+```
+http://your-server:3010/v1
+```
+
+如果您在反向代理（Nginx、Caddy）后运行，请使用您配置的 HTTPS 域名。
+
+## 请求格式
+
+每个 `POST` 请求必须使用标准的 `ReqPayload<T>` 信封：
+
+| 字段 | 类型 | 描述 |
+|---|---|---|
+| `sign` | string | `data` 对象 JSON 字符串的 HMAC-SHA256 签名 |
+| `timestamp` | integer | Unix 时间戳（秒） |
+| `nonce` | string | 唯一请求标识符 |
+| `data` | object | 实际的请求参数 |
+
+```json
+{
+  "sign": "a1b2c3d4e5f6...",
+  "timestamp": 1717000000,
+  "nonce": "550e8400-e29b-41d4-a716-446655440000",
+  "data": {
+    "amount": "100.00",
+    "symbol": "USDT",
+    "chain": "TRON"
+  }
+}
+```
+
+查看[身份认证](/zh/api-reference/authentication)页面了解如何计算 `sign` 值。
+
+## 响应格式
+
+所有响应都使用标准的 `R<T>` 信封：
+
+```json
+{
+  "code": 200,
+  "msg": "success",
+  "data": { ... }
+}
+```
+
+| 字段 | 类型 | 描述 |
+|---|---|---|
+| `code` | integer | HTTP 状态码（成功时为 200） |
+| `msg` | string | 状态消息（`"success"` 或错误描述） |
+| `data` | object | 响应负载（因端点而异） |
+
+### 错误响应
+
+```json
+{
+  "code": 400,
+  "msg": "The amount cannot be left blank.",
+  "data": null
+}
+```
+
+## 身份认证
+
+所有请求都必须使用您的商家令牌通过 HMAC-SHA256 签名。不涉及 Bearer 令牌或 Cookie。商家令牌在您的网关中配置，且从不通过网络传输。请参阅[身份认证](/zh/api-reference/authentication)页面获取完整的签名参考。
+
+## HTTP 方法
+
+| 方法 | 用途 |
+|---|---|
+| `POST` | 创建资源（收款、付款） |
+| `GET` | 获取资源或列表 |
+
+## 速率限制
+
+速率限制在网关配置中对每个商家可配置。默认值：
+
+| 端点 | 限制 |
+|---|---|
+| `POST /v1/order/createCollection` | 每 10 秒 100 次 |
+| `POST /v1/order/createPayout` | 每 10 秒 100 次 |
+| `GET /v1/order/status/{orderId}` | 每 10 秒 1000 次 |
+| `GET /v1/order/pay` | 每秒每个 orderId 2 次 |
+| `GET /v1/order/getOrderStatus` | 每秒每个 orderId 2 次 |
+| `GET /v1/symbol/supportSymbols` | 每 10 秒 50 次 |
+
+超出限制会返回 `429 Too Many Requests` 响应。
+
+## 金额
+
+所有金额都表示为**字符串格式的十进制数**（例如 `"100.00"` 表示 100 USDT）。小数位数取决于代币配置的小数位数——USDT 在大多数链上使用 2 位小数（显示为 `"100.00"`），而内部表示使用代币的原生小数位数。

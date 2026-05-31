@@ -1,0 +1,99 @@
+---
+title: "XPayLabs 常见问题：自托管加密支付"
+sidebarTitle: "常见问题"
+description: "关于 XPayLabs 的常见问题解答——部署、支持的区块链、API 集成、Webhook、安全性和零费用定价模式。"
+keywords: ["XPayLabs", "FAQ", "常见问题", "加密支付", "自托管", "非托管", "USDT", "TRON"]
+---
+
+关于 XPayLabs 的常见问题解答——部署、支持的区块链、API 集成、Webhook、安全性和定价。有关集成相关问题，请参考相关指南或 API 参考页面。
+
+## 通用
+
+<Accordion title="什么是 XPayLabs？">
+  XPayLabs 是一个自托管的非托管加密支付基础设施。它使企业能够在 TRON、EVM 链和 SUI 上接受、处理和结算稳定币支付，而无需依赖第三方支付处理器。您将其部署在自己的服务器上，您的私钥保留在您的基础设施内，且无需支付任何网关费用——仅需支付区块链 gas 费用。
+</Accordion>
+
+<Accordion title="XPayLabs 是自托管还是托管式？">
+  完全自托管。您使用 Docker Compose 在您自己的基础设施上部署网关。XPayLabs 不运营托管的 SaaS 平台。所有数据、密钥和资金都保持在您的控制范围内。
+</Accordion>
+
+<Accordion title="XPayLabs 是否是非托管的？">
+  是的。私钥仅在您的 Docker 容器内生成和存储。没有任何第三方可以访问或转移您的资金。网关软件从不通过网络传输密钥。
+</Accordion>
+
+<Accordion title="系统要求是什么？">
+  推荐最低配置：8GB 内存 / 4 vCPU。对于高并发或集群部署：16GB 内存 / 8 vCPU。网关需要 Docker 和 Docker Compose。推荐使用 Ubuntu 22.04+。
+</Accordion>
+
+## 区块链与代币
+
+<Accordion title="支持哪些区块链？">
+  XPayLabs 原生支持 TRON（TRC20）、Ethereum、BNB Chain、Polygon、Avalanche C-Chain 和 SUI。开发时支持测试网（TRON Shasta、ETH Sepolia、BSC Testnet、Polygon Amoy、Avalanche Fuji、SUI Testnet）。
+</Accordion>
+
+<Accordion title="支持哪些代币？">
+  USDT 和 USDC 在大多数链上开箱即用。通过在网关配置中声明智能合约地址，可配置额外的 ERC20/TRC20/BEP20 代币。
+</Accordion>
+
+<Accordion title="我可以添加自定义代币吗？">
+  可以。通过在网关的资产类型配置中指定合约地址、代币符号和小数位数来添加任何符合标准的代币。扫描器会监控合约的 `Transfer` 事件日志以检测传入交易。
+</Accordion>
+
+## API 与集成
+
+<Accordion title="API 使用什么身份认证方式？">
+  所有请求都使用 HMAC-SHA256 请求签名进行身份验证。您在网关中配置一个商家令牌，每个 API 请求都包含一个基于请求负载计算的签名。商家令牌不会通过网络传输。
+</Accordion>
+
+<Accordion title="如何创建支付？">
+  调用 `POST /v1/order/createCollection`，传入金额、代币符号和链信息。网关返回一个唯一的充值地址。您的客户将资金发送到该地址，区块链扫描器会自动检测支付。
+</Accordion>
+
+<Accordion title="Webhook 是如何工作的？">
+  在网关中配置回调 URL。当订单或收款状态发生变化时，网关会发送一个带有事件类型和订单数据的已签名 `POST` 请求。使用您的 webhook 密钥验证 HMAC-SHA256 签名。
+</Accordion>
+
+<Accordion title="我可以轮询订单状态而不是使用 Webhook 吗？">
+  可以。使用 `GET /v1/order/getOrderStatus?orderId=...&sign=...` 或 `GET /v1/order/status/{orderId}` 获取当前订单状态。但建议在生产环境中使用 Webhook。
+</Accordion>
+
+## 部署
+
+<Accordion title="如何部署 XPayLabs？">
+  克隆仓库并运行 `docker compose up -d`。配置您的区块链 RPC 端点，生成钱包助记词，并设置您的商家令牌。网关在 3010 端口暴露 API。
+</Accordion>
+
+<Accordion title="我需要区块链 RPC 端点吗？">
+  是的。网关需要为您要支持的每条区块链配置 RPC 端点。您可以使用公共 RPC 提供商（例如 Trongrid、Infura）或运行自己的节点。
+</Accordion>
+
+<Accordion title="我可以使用反向代理吗？">
+  可以。建议将 XPayLabs 置于 Nginx 或 Caddy 之后，以实现 TLS 终止和域名路由。网关本身在 3010 端口上提供 HTTP 服务。
+</Accordion>
+
+## 安全
+
+<Accordion title="我的私钥存储在哪里？">
+  私钥在您的 Docker 容器的内存和加密存储中生成和存储。它们永远不会离开您的基础设施。钱包种子由您在网关中配置的助记词短语派生而来。
+</Accordion>
+
+<Accordion title="如果我的服务器宕机了会怎样？">
+  由于 XPayLabs 是非托管的，资金始终保留在区块链上——宕机期间不存在资金损失风险。当网关重新启动时，区块链扫描器会重放错过的区块并检测宕机期间发生的任何交易。
+</Accordion>
+
+<Accordion title="如何保护网关安全？">
+  - 将网关置于防火墙之后，仅在 3010 端口接受必要流量。
+  - 对所有面向外部的端点使用带 TLS 的反向代理。
+  - 将管理面板访问限制在内部网络或 VPN 内。
+  - 定期离线备份您的钱包助记词。
+</Accordion>
+
+## 费用
+
+<Accordion title="XPayLabs 收取什么费用？">
+  零网关费用。您只需支付区块链网络 gas 费用（例如 TRON 带宽/能量、Ethereum gas）。没有每笔交易费用、月费或按比例收费。
+</Accordion>
+
+<Accordion title="Gas 费用是多少？">
+  Gas 费用因区块链和网络拥堵情况而异。典型费用：TRON ~$0.01，Ethereum ~$0.50-$5.00，BSC ~$0.05-$0.20，Polygon ~$0.01-$0.05，SUI ~$0.01。
+</Accordion>

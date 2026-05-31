@@ -1,0 +1,181 @@
+---
+title: "创建收款订单 | POST /v1/order/createCollection"
+sidebarTitle: "创建收款"
+description: "创建收款订单以接收加密支付。返回唯一的充值地址和供客户发送资金的结账 URL。"
+keywords: ["创建收款", "收款订单", "充值地址", "POST", "API", "XPayLabs"]
+---
+
+创建一个新的收款订单。网关为指定的区块链和代币生成一个唯一的充值地址。您的客户将资金发送到此地址，区块链扫描器自动检测交易。
+
+## 请求
+
+**`POST http://your-gateway:3010/v1/order/createCollection`**
+
+### 请求头
+
+| 头部 | 值 |
+|---|---|
+| `Content-Type` | `application/json` |
+
+### 请求体参数（`data` 字段）
+
+<ParamField body="amount" type="string" required>
+  支付金额，十进制字符串格式，例如 `"100.00"`。必须大于零。
+</ParamField>
+
+<ParamField body="symbol" type="string" required>
+  要接受的代币符号，例如 `"USDT"`。必须是指定链上支持的代币。
+</ParamField>
+
+<ParamField body="chain" type="string" required>
+  区块链网络：
+  - `TRON` — TRC20 代币（USDT、USDC）
+  - `ETH` — Ethereum ERC20
+  - `BSC` — BNB Smart Chain BEP20
+  - `POLYGON` — Polygon
+  - `AVAX_C_CHAIN` — Avalanche C-Chain
+  - `SUI` — SUI Network
+</ParamField>
+
+<ParamField body="orderId" type="string" optional>
+  您的唯一订单标识符。V3 商家必填。用于将收款与您的内部订单系统关联。
+</ParamField>
+
+<ParamField body="uid" type="string" optional>
+  您的内部用户标识符。V2 商家必填。不能为 `"0"`。
+</ParamField>
+
+### cURL
+
+```bash
+curl -X POST http://your-gateway:3010/v1/order/createCollection \
+  -H "Content-Type: application/json" \
+  -d '{
+    "sign": "a1b2c3d4e5f6...",
+    "timestamp": 1717000000,
+    "nonce": "550e8400-e29b-41d4-a716-446655440000",
+    "data": {
+      "amount": "250.00",
+      "symbol": "USDT",
+      "chain": "TRON",
+      "orderId": "order_1042"
+    }
+  }'
+```
+
+### Node.js
+
+```javascript
+import crypto from "crypto";
+
+const MERCHANT_TOKEN = process.env.XPAYLABS_TOKEN;
+
+function signRequest(data) {
+  return crypto
+    .createHmac("sha256", MERCHANT_TOKEN)
+    .update(JSON.stringify(data), "utf8")
+    .digest("hex");
+}
+
+const data = { amount: "250.00", symbol: "USDT", chain: "TRON", orderId: "order_1042" };
+const payload = {
+  sign: signRequest(data),
+  timestamp: Math.floor(Date.now() / 1000),
+  nonce: crypto.randomUUID(),
+  data,
+};
+
+const response = await fetch("http://your-gateway:3010/v1/order/createCollection", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify(payload),
+});
+
+const result = await response.json();
+console.log(result.data.address);    // 充值地址
+console.log(result.data.paymentUrl); // 结账 URL
+```
+
+---
+
+## 响应
+
+成功的请求返回 HTTP `200`，带 `R<PaymentAddress>` 信封。
+
+### PaymentAddress 对象
+
+<ResponseField name="address" type="string">
+  生成的充值地址，客户将资金发送到此地址。
+</ResponseField>
+
+<ResponseField name="amount" type="string">
+  收款金额，十进制字符串格式。与请求金额一致。
+</ResponseField>
+
+<ResponseField name="symbol" type="string">
+  此收款的代币符号。
+</ResponseField>
+
+<ResponseField name="chain" type="string">
+  区块链网络。
+</ResponseField>
+
+<ResponseField name="orderId" type="string">
+  您的订单标识符，从请求中原样返回。
+</ResponseField>
+
+<ResponseField name="uid" type="string">
+  您的用户标识符，从请求中原样返回。
+</ResponseField>
+
+<ResponseField name="expiredTime" type="integer">
+  此收款过期的 Unix 时间戳。过期后，充值地址不再对新交易有效。
+</ResponseField>
+
+<ResponseField name="paymentUrl" type="string">
+  托管结账页面的 URL，客户可在此查看支付说明和二维码。
+</ResponseField>
+
+### 示例响应
+
+```json
+{
+  "code": 200,
+  "msg": "success",
+  "data": {
+    "address": "TWkKZkmuB8DpVeiMoHiKf99ZoFHzk73CqR",
+    "amount": "250.00",
+    "symbol": "USDT",
+    "chain": "TRON",
+    "orderId": "order_1042",
+    "uid": null,
+    "expiredTime": 1717086400,
+    "paymentUrl": "http://your-gateway:3010/checkout?orderId=order_1042"
+  }
+}
+```
+
+---
+
+## 错误响应
+
+### `400` — 验证错误
+
+| 消息 | 原因 |
+|---|---|
+| `"The amount cannot be left blank."` | `amount` 缺失或为 null |
+| `"The symbol cannot be left blank."` | `symbol` 缺失或为空 |
+| `"The chain cannot be left blank."` | `chain` 缺失或无效 |
+| `"The orderId cannot be left blank."` | V3 商家需要 `orderId` 但缺失 |
+| `"The uid cannot be left blank."` | V2 商家需要 `uid` 但缺失 |
+| `"The uid cannot be zero."` | `uid` 被设置为 `"0"` |
+
+### `429` — 超出速率限制
+
+```json
+{
+  "code": 429,
+  "msg": "Too many requests. Please slow down.",
+  "data": null
+}
+```

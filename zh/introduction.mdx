@@ -1,0 +1,67 @@
+---
+title: "XPayLabs：自托管加密支付网关"
+sidebarTitle: "简介"
+description: "XPayLabs 是一个自托管的非托管加密支付网关。部署在您自己的服务器上，在 TRON、EVM 链和 SUI 上接受稳定币支付，零网关费用。"
+keywords: ["XPayLabs", "加密支付", "自托管", "非托管", "稳定币", "TRON", "EVM", "SUI", "支付网关"]
+---
+
+XPayLabs 是一个自托管的加密支付基础设施，让您能够通过单一 API 在多个区块链上接受和管理稳定币支付。与托管式支付网关不同，XPayLabs 完全运行在您自己的基础设施上——您的私钥保留在您的服务器上，您的资金直接到达您的钱包，并且您支付零网关费用。每个网关实例每秒可处理多达 100 笔交易，无每笔交易费用——仅需支付区块链 gas 费用（每笔交易 $0.01–$0.50）。
+
+<CardGroup cols={2}>
+  <Card title="快速开始" icon="rocket" href="/zh/quickstart">
+    部署支付网关并在几分钟内创建您的第一笔收款订单
+  </Card>
+  <Card title="身份认证" icon="key" href="/zh/authentication">
+    生成商家令牌并安全签署您的请求
+  </Card>
+  <Card title="API 参考" icon="code" href="/zh/api-reference/overview">
+    探索每个端点、参数和响应字段
+  </Card>
+  <Card title="指南" icon="book-open" href="/zh/guides/accept-payments">
+    收款和付款流程的逐步教程
+  </Card>
+</CardGroup>
+
+## 支持的区块链
+
+XPayLabs 原生支持以下区块链网络：
+
+| 链 | 类型 | 稳定币 |
+|---|---|---|
+| **TRON** | TRC20 | USDT、USDC |
+| **Ethereum** | ERC20 | USDT、USDC、DAI |
+| **BNB Chain** | BEP20 | USDT、USDC、BUSD |
+| **Polygon** | ERC20 | USDT、USDC、DAI |
+| **Avalanche C-Chain** | ERC20 | USDT、USDC |
+| **SUI** | 原生 | USDC |
+
+## XPayLabs 如何处理支付？
+
+<Steps>
+  <Step title="部署网关">
+    在您的服务器上运行 `docker compose up -d`。XPayLabs 核心容器启动所有服务——API 服务器、区块链扫描器、Webhook 分发器和结账 UI。
+  </Step>
+  <Step title="生成 API 凭证">
+    在网关管理面板中配置您的商家令牌。该令牌用于使用 HMAC-SHA256 签署每个 API 请求。
+  </Step>
+  <Step title="创建收款订单">
+    发送包含金额、代币符号和链信息的 `POST /v1/order/createCollection` 请求。XPayLabs 返回一个唯一的充值地址和结账 URL。
+  </Step>
+  <Step title="监听 Webhook">
+    注册您的回调 URL。当区块链扫描器检测到传入交易时，XPayLabs 会发送一个已签名的 webhook 通知。
+  </Step>
+</Steps>
+
+## 核心概念
+
+| 概念 | 描述 |
+|---|---|
+| **收款** | 生成唯一充值地址的支付请求 |
+| **付款** | 从您的网关钱包到外部地址的资金划转 |
+| **结算** | 自动将收到的资金从热钱包转入冷钱包 |
+| **Webhook** | 由订单或收款状态变更触发的 HTTP 回调 |
+| **扫描器** | 实时监控传入交易的区块链索引器 |
+
+<Tip>
+  由于 XPayLabs 是自托管的，您可以完全控制您的资金。没有第三方持有您的私钥，也不会从您的交易中扣除任何网关费用——您只需支付区块链网络 gas 费用。
+</Tip>

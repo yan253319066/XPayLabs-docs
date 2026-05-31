@@ -1,0 +1,78 @@
+---
+title: "收款订单：XPayLabs 加密支付工作原理"
+sidebarTitle: "支付"
+description: "XPayLabs 收款订单为每笔交易生成唯一的充值地址。通过订单状态和 Webhook 事件追踪从创建到链上确认的完整生命周期。"
+keywords: ["收款", "订单", "支付", "充值地址", "订单状态", "Webhook", "XPayLabs"]
+---
+
+**收款订单**是 XPayLabs 中的核心支付原语。当客户想要用加密货币向您支付时，您的服务器通过 API 创建一个收款订单。网关为这笔交易生成一个唯一的充值地址，监控区块链上的传入资金，并在支付确认时通知您的服务器。
+
+## 收款订单的生命周期
+
+<Steps>
+  <Step title="订单已创建">
+    您的服务器调用 `POST /v1/order/createCollection`，传入金额、代币符号和链信息。网关创建一个状态为 `INIT` 的订单，并返回唯一的充值地址和结账 URL。
+  </Step>
+  <Step title="等待支付">
+    订单进入 `PENDING` 状态。客户在结账页面上看到充值地址和二维码。订单有一个可配置的过期时间。
+  </Step>
+  <Step title="检测到交易">
+    区块链扫描器检测到与金额和充值地址匹配的传入交易。状态变更为 `PENDING_CONFIRMATION`。发送 Webhook（`ORDER_PENDING_CONFIRMATION`）并附带交易详情。
+  </Step>
+  <Step title="已确认">
+    在达到所需的区块确认数（每条链可配置）后，订单状态变更为 `SUCCESS`。发送 Webhook（`ORDER_SUCCESS`）。资金现已进入您的网关热钱包。
+  </Step>
+  <Step title="已过期或失败">
+    如果在过期时间之前未收到付款，订单状态变为 `EXPIRED`。如果交易验证失败，则变为 `FAILED`。
+  </Step>
+</Steps>
+
+## XPayLabs 使用哪些订单状态？
+
+| 状态 | 描述 |
+|---|---|
+| `INIT` | 订单已创建，充值地址已生成 |
+| `PENDING` | 等待客户支付 |
+| `PENDING_CONFIRMATION` | 检测到交易，等待区块确认 |
+| `SUCCESS` | 支付已确认，资金可用 |
+| `EXPIRED` | 订单过期，未收到支付 |
+| `FAILED` | 收款或付款失败 |
+
+## 收款如何从服务器流向区块链？
+
+```
+商家服务器          XPayLabs 网关          区块链            客户
+     |                         |                       |                    |
+     |-- POST /createCollection -->|                    |                    |
+     |<-- PaymentAddress ---------|                    |                    |
+     |                         |                       |                    |
+     |                         |                       |<-- 发送资金 ----|
+     |                         |<-- 扫描器检测 ---|                    |
+     |<-- Webhook: PENDING_CONFIRMATION                |                    |
+     |                         |                       |                    |
+     |                         |<-- 区块确认 ---|                    |
+     |<-- Webhook: ORDER_SUCCESS                       |                    |
+```
+
+## PaymentAddress 对象
+
+创建收款时，网关返回一个 `PaymentAddress` 对象：
+
+| 字段 | 描述 |
+|---|---|
+| `address` | 此收款的唯一充值地址 |
+| `amount` | 请求的金额 |
+| `symbol` | 代币符号（例如 USDT） |
+| `chain` | 区块链网络 |
+| `orderId` | 您的订单标识符 |
+| `uid` | 您的用户标识符 |
+| `expiredTime` | 订单过期时间戳 |
+| `paymentUrl` | 含二维码的结账页面 URL |
+
+## 金额格式
+
+所有金额均为**字符串格式的十进制数**（例如 `"100.00"`）。这避免了 JavaScript 处理大数时常见的浮点精度问题。内部使用 Java 后端的 `BigDecimal` 表示，确保精确精度。
+
+## 充值地址
+
+每个收款订单都会获得一个**唯一的单次使用充值地址**。这提供了清晰的链上归属——您始终可以通过查看区块链交易中的充值地址来确定哪个客户为哪个订单付款。地址是从网关的 HD 钱包种子确定性生成的，因此无需预生成或外部存储。

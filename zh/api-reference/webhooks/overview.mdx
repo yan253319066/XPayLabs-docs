@@ -1,0 +1,155 @@
+---
+title: "Webhook 通知 — XPayLabs 事件回调参考"
+sidebarTitle: "端点"
+description: "当订单或收款状态变更时，XPayLabs 会向您配置的端点 URL 投递已签名的 Webhook 回调。了解如何配置端点和验证负载。"
+keywords: ["Webhook", "回调", "通知", "签名验证", "端点", "XPayLabs"]
+---
+
+每当订单或收款状态变更时，XPayLabs 会向您配置的端点 URL 发送 HTTP POST 回调。无需轮询 API 获取状态变更——注册您的回调 URL，实时接收已签名的通知。
+
+## 配置
+
+在网关配置中设置您的 Webhook 端点 URL 和共享密钥：
+
+```yaml
+xpay:
+  merchant:
+    callback-url: "https://yourapp.com/webhooks/xpaylabs"
+    webhook-secret: "your-webhook-secret-here"
+```
+
+`webhook-secret` 用于计算每个 Webhook 负载中的 `sign` 字段，使您能够验证通知确实来自您的网关。
+
+## 负载格式
+
+每个 Webhook 回调都是一个 `POST` 请求，JSON 体遵循 `NotifyPayload` 结构：
+
+| 字段 | 类型 | 描述 |
+|---|---|---|
+| `sign` | string | 用于负载验证的 HMAC-SHA256 签名 |
+| `timestamp` | integer | 通知生成时的 Unix 时间戳 |
+| `nonce` | string | 唯一事件标识符 |
+| `notifyType` | string | 事件类型（参见[事件类型](/zh/api-reference/webhooks/events)）|
+| `data` | object | 事件负载（NotifyOrder 对象） |
+
+### 示例负载
+
+```json
+{
+  "sign": "a1b2c3d4e5f6...",
+  "timestamp": 1717000123,
+  "nonce": "550e8400-e29b-41d4-a716-446655440000",
+  "notifyType": "ORDER_SUCCESS",
+  "data": {
+    "orderId": "order_1042",
+    "uid": "user_42",
+    "orderType": "COLLECTION",
+    "status": "SUCCESS",
+    "reason": null,
+    "amount": "250.00",
+    "actualAmount": "249.50",
+    "fee": "0.00",
+    "transaction": {
+      "chain": "TRON",
+      "symbol": "USDT",
+      "txid": "a1b2c3d4e5f6...",
+      "from": "TXyz...",
+      "to": "TWkKZkmuB8DpVeiMoHiKf99ZoFHzk73CqR",
+      "amount": "250.00",
+      "blockNum": 12345678,
+      "confirmedNum": 3,
+      "status": "SUCCESS",
+      "timestamp": 1717000123
+    }
+  }
+}
+```
+
+## 签名验证
+
+使用您的 `webhook-secret` 验证 Webhook 签名：
+
+### 算法
+
+1. 将 `data` 对象（负载中的 `data` 字段）序列化为紧凑 JSON。
+2. 计算 `HMAC-SHA256(data_json, webhook_secret)`。
+3. 转换为小写十六进制并与 `sign` 字段比较。
+
+### Node.js
+
+```javascript
+import crypto from "crypto";
+
+export function verifyWebhook(payload, secret) {
+  const dataJson = JSON.stringify(payload.data);
+  const expectedSign = crypto
+    .createHmac("sha256", secret)
+    .update(dataJson, "utf8")
+    .digest("hex");
+
+  if (!crypto.timingSafeEqual(
+    Buffer.from(expectedSign, "hex"),
+    Buffer.from(payload.sign, "hex")
+  )) {
+    throw new Error("无效的 Webhook 签名");
+  }
+
+  return true;
+}
+
+app.post("/webhooks/xpaylabs", express.json(), (req, res) => {
+  try {
+    verifyWebhook(req.body, process.env.XPAYLABS_WEBHOOK_SECRET);
+  } catch (err) {
+    return res.status(400).send("验证失败");
+  }
+
+  const event = req.body;
+  res.status(200).send("ok");
+});
+```
+
+### Python
+
+```python
+import hmac, hashlib, json
+from flask import Flask, request
+
+app = Flask(__name__)
+WEBHOOK_SECRET = "your-webhook-secret"
+
+@app.route("/webhooks/xpaylabs", methods=["POST"])
+def handle_webhook():
+    payload = request.get_json()
+    data_json = json.dumps(payload["data"], separators=(",", ":"))
+    expected_sign = hmac.new(
+        WEBHOOK_SECRET.encode(),
+        data_json.encode(),
+        hashlib.sha256,
+    ).hexdigest()
+
+    if not hmac.compare_digest(expected_sign, payload["sign"]):
+        return "无效签名", 400
+
+    return "", 200
+```
+
+## 重试策略
+
+如果您的端点在 10 秒内未返回 `2xx` 状态码，XPayLabs 会使用指数退避重试 Webhook：
+
+| 尝试 | 延迟 |
+|---|---|
+| 第 1 次重试 | ~1 秒 |
+| 第 2 次重试 | ~5 秒 |
+| 第 3 次重试 | ~30 秒 |
+| 第 4 次重试 | ~5 分钟 |
+
+4 次尝试失败后，通知被标记为失败。失败的 Webhook 会被记录，并可从网关管理面板重新发送。
+
+## 最佳实践
+
+- **立即响应。** 尽快返回 `200`，然后异步处理事件。
+- **验证每个负载。** 在处理 Webhook 之前始终检查 HMAC 签名。
+- **使用 `nonce` 去重。** 存储已处理的 nonce 以处理至少投递一次的模式。
+- **检查 `notifyType`。** 根据通知类型路由事件以正确处理每个事件。

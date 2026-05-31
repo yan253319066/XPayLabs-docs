@@ -1,0 +1,123 @@
+---
+title: "部署 XPayLabs：Docker Compose 加密支付快速入门"
+sidebarTitle: "快速开始"
+description: "使用 Docker Compose 部署 XPayLabs，配置您的商家令牌，并在 15 分钟内创建您的第一笔加密收款。"
+keywords: ["XPayLabs", "Docker Compose", "部署", "快速开始", "加密支付", "USDT", "收款"]
+---
+
+使用 Docker Compose 部署 XPayLabs 并在 15 分钟内创建您的第一笔收款订单。完成本指南后，您将在自己的基础设施上拥有一个正常运行的加密支付网关，并完成一个测试收款。
+
+## 前提条件
+
+- 一台 **8GB 内存 / 4 vCPU** 的服务器（推荐 Ubuntu 22.04+）
+- 已安装 **Docker** 和 **Docker Compose**
+- 您要支持的区块链（TRON、EVM、SUI）的 RPC 端点
+
+---
+
+## 4 步部署 XPayLabs
+
+<Steps>
+  <Step title="使用 Docker Compose 部署 XPayLabs">
+    克隆仓库并启动所有服务：
+
+    ```bash
+    git clone https://github.com/xpaylabs/gateway.git
+    cd gateway
+    docker compose up -d
+    ```
+
+    这将启动核心 API 服务器（端口 `3010`）、区块链扫描器、Webhook 分发器和结账 UI。验证所有服务是否正常运行：
+
+    ```bash
+    docker compose ps
+    ```
+
+    所有服务应显示 `Up` 状态。
+  </Step>
+
+  <Step title="配置您的商家令牌">
+    XPayLabs 使用 HMAC-SHA256 签名对 API 请求进行身份验证。您的商家令牌在网关配置文件中配置：
+
+    ```yaml
+    # config/application.yml
+    xpay:
+      merchant:
+        token: "your-merchant-token-here"
+        webhook-secret: "your-webhook-secret-here"
+    ```
+
+    更改配置后重启核心容器：
+
+    ```bash
+    docker compose restart core
+    ```
+
+    <Note>
+      商家令牌是一个共享密钥。它永远不会直接出现在 API 请求中——相反，您使用它对请求负载进行签名。请安全存储，切勿提交到版本控制系统。
+    </Note>
+  </Step>
+
+  <Step title="创建测试收款">
+    发送 `POST` 请求创建收款订单。请求体必须包含基于负载计算的 `sign` 字段。
+
+    ```bash
+    # 将 TOKEN 替换为您的商家令牌
+    curl --request POST \
+      --url http://your-server:3010/v1/order/createCollection \
+      --header "Content-Type: application/json" \
+      --data '{
+        "sign": "generated_hmac_signature",
+        "timestamp": 1717000000,
+        "nonce": "unique_nonce_123",
+        "data": {
+          "amount": "100.00",
+          "symbol": "USDT",
+          "chain": "TRON",
+          "orderId": "merchant_order_001"
+        }
+      }'
+    ```
+
+    查看[身份认证](/zh/authentication)页面了解如何计算 `sign` 值。
+  </Step>
+
+  <Step title="验证收款响应">
+    成功响应会返回支付地址和结账 URL：
+
+    ```json
+    {
+      "code": 200,
+      "msg": "success",
+      "data": {
+        "address": "TWkKZkmuB8DpVeiMoHiKf99ZoFHzk73CqR",
+        "amount": "100.00",
+        "symbol": "USDT",
+        "chain": "TRON",
+        "orderId": "merchant_order_001",
+        "expiredTime": 1717086400,
+        "paymentUrl": "http://your-server/checkout?orderId=merchant_order_001"
+      }
+    }
+    ```
+
+    `address` 字段是您的客户发送资金的地址。`paymentUrl` 指向一个包含二维码和支付说明的托管结账页面。
+  </Step>
+</Steps>
+
+---
+
+## 下一步
+
+<CardGroup cols={2}>
+  <Card title="身份认证" icon="key" href="/zh/authentication">
+    了解 HMAC 签名算法以及如何在您的开发语言中实现它。
+  </Card>
+  <Card title="API 参考" icon="code" href="/zh/api-reference/overview">
+    探索所有收付款和 Webhook 端点。
+  </Card>
+</CardGroup>
+
+<Tip>
+  开发期间，请使用测试网（TRON Shasta、ETH Sepolia、BSC Testnet）以避免真实的 gas 费用。请参阅[测试指南](/zh/guides/testing)了解测试网配置和测试代币水龙头。
+</Tip>

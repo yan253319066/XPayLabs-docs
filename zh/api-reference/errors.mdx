@@ -1,0 +1,100 @@
+---
+title: "XPayLabs API 错误码及处理方法"
+sidebarTitle: "错误"
+description: "XPayLabs 返回带有 HTTP 兼容状态码的结构化错误响应。了解错误格式、常见代码以及如何处理失败。"
+keywords: ["错误码", "错误处理", "API 错误", "HTTP 状态码", "XPayLabs"]
+---
+
+XPayLabs 使用一致的响应信封返回错误，包含与 HTTP 兼容的 `code` 字段和人类可读的 `msg` 字段。
+
+## 错误响应格式
+
+```json
+{
+  "code": 400,
+  "msg": "The amount cannot be left blank.",
+  "data": null
+}
+```
+
+| 字段 | 类型 | 描述 |
+|---|---|---|
+| `code` | integer | 与 HTTP 兼容的状态码 |
+| `msg` | string | 人类可读的错误描述 |
+| `data` | null | 错误响应中始终为 `null` |
+
+## HTTP 状态码
+
+| 码 | 含义 | 典型原因 |
+|---|---|---|
+| `400` | 错误请求 | 缺少或无效的请求参数 |
+| `401` | 未授权 | HMAC 签名无效或时间戳已过期 |
+| `422` | 不可处理 | 业务逻辑错误（例如，地址对该链无效） |
+| `429` | 请求过多 | 超出速率限制 |
+| `500` | 内部服务器错误 | 意外的服务器错误 |
+
+## 常见错误码
+
+### 签名验证错误 (`401`)
+
+| 消息 | 原因 |
+|---|---|
+| `"Sign verification failed"` | HMAC 签名与计算值不匹配 |
+| `"The sign cannot be left blank."` | `sign` 字段缺失 |
+| `"The timestamp cannot be left blank."` | `timestamp` 字段缺失 |
+| `"The nonce cannot be left blank."` | `nonce` 字段缺失 |
+
+### 验证错误 (`400`)
+
+| 消息 | 原因 |
+|---|---|
+| `"The amount cannot be left blank."` | 金额缺失或为 null |
+| `"The symbol cannot be left blank."` | 代币符号缺失或为空 |
+| `"The chain cannot be left blank."` | 链缺失或无效 |
+| `"The receiveAddress cannot be left blank."` | 付款地址缺失 |
+| `"ReceiveAddress error"` | 付款地址对指定链无效 |
+| `"The orderId cannot be left blank."` | 此商家版本需要 orderId |
+| `"The uid cannot be left blank."` | 此商家版本需要 uid |
+| `"The uid cannot be zero."` | uid 不能为字符串 "0" |
+
+### 速率限制错误 (`429`)
+
+```json
+{
+  "code": 429,
+  "msg": "Too many requests. Please slow down.",
+  "data": null
+}
+```
+
+## 错误处理
+
+```javascript
+async function createCollection(payload) {
+  const response = await fetch("http://your-gateway:3010/v1/order/createCollection", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  const result = await response.json();
+
+  if (result.code !== 200) {
+    console.error(`请求失败：${result.msg}`);
+    switch (result.code) {
+      case 401:
+        // 重新计算签名并重试
+        break;
+      case 400:
+        // 修复请求参数
+        break;
+      case 429:
+        // 退避后重试
+        break;
+    }
+    return null;
+  }
+
+  return result.data;
+}
+```

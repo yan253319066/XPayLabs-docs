@@ -29,79 +29,165 @@
     }
   },
   "navigation": {
-    "tabs": [
+    "languages": [
       {
-        "tab": "Documentation",
-        "groups": [
+        "language": "en",
+        "tabs": [
           {
-            "group": "Get Started",
-            "pages": [
-              "introduction",
-              "quickstart",
-              "authentication"
+            "tab": "Documentation",
+            "groups": [
+              {
+                "group": "Get Started",
+                "pages": [
+                  "introduction",
+                  "quickstart",
+                  "authentication"
+                ]
+              },
+              {
+                "group": "Core Concepts",
+                "pages": [
+                  "concepts/payments",
+                  "concepts/settlements",
+                  "concepts/webhooks",
+                  "concepts/errors"
+                ]
+              },
+              {
+                "group": "Guides",
+                "pages": [
+                  "guides/accept-payments",
+                  "guides/payouts",
+                  "guides/spring-boot-integration",
+                  "guides/nodejs-integration",
+                  "guides/ai-agents",
+                  "guides/testing"
+                ]
+              },
+              {
+                "group": "Support",
+                "pages": [
+                  "faq",
+                  "troubleshooting"
+                ]
+              }
             ]
           },
           {
-            "group": "Core Concepts",
-            "pages": [
-              "concepts/payments",
-              "concepts/settlements",
-              "concepts/webhooks",
-              "concepts/errors"
-            ]
-          },
-          {
-            "group": "Guides",
-            "pages": [
-              "guides/accept-payments",
-              "guides/payouts",
-              "guides/spring-boot-integration",
-              "guides/nodejs-integration",
-              "guides/ai-agents",
-              "guides/testing"
-            ]
-          },
-          {
-            "group": "Support",
-            "pages": [
-              "faq",
-              "troubleshooting"
+            "tab": "API Reference",
+            "groups": [
+              {
+                "group": "Overview",
+                "pages": [
+                  "api-reference/overview",
+                  "api-reference/authentication",
+                  "api-reference/errors"
+                ]
+              },
+              {
+                "group": "Orders",
+                "pages": [
+                  "api-reference/order/create-collection",
+                  "api-reference/order/create-payout",
+                  "api-reference/order/status",
+                  "api-reference/order/pay-link",
+                  "api-reference/order/order-status"
+                ]
+              },
+              {
+                "group": "Symbols",
+                "pages": [
+                  "api-reference/symbols/support-symbols"
+                ]
+              },
+              {
+                "group": "Webhooks",
+                "pages": [
+                  "api-reference/webhooks/overview",
+                  "api-reference/webhooks/events"
+                ]
+              }
             ]
           }
         ]
       },
       {
-        "tab": "API Reference",
-        "groups": [
+        "language": "zh",
+        "tabs": [
           {
-            "group": "Overview",
-            "pages": [
-              "api-reference/overview",
-              "api-reference/authentication",
-              "api-reference/errors"
+            "tab": "文档",
+            "groups": [
+              {
+                "group": "快速入门",
+                "pages": [
+                  "zh/introduction",
+                  "zh/quickstart",
+                  "zh/authentication"
+                ]
+              },
+              {
+                "group": "核心概念",
+                "pages": [
+                  "zh/concepts/payments",
+                  "zh/concepts/settlements",
+                  "zh/concepts/webhooks",
+                  "zh/concepts/errors"
+                ]
+              },
+              {
+                "group": "指南",
+                "pages": [
+                  "zh/guides/accept-payments",
+                  "zh/guides/payouts",
+                  "zh/guides/spring-boot-integration",
+                  "zh/guides/nodejs-integration",
+                  "zh/guides/ai-agents",
+                  "zh/guides/testing"
+                ]
+              },
+              {
+                "group": "支持",
+                "pages": [
+                  "zh/faq",
+                  "zh/troubleshooting"
+                ]
+              }
             ]
           },
           {
-            "group": "Orders",
-            "pages": [
-              "api-reference/order/create-collection",
-              "api-reference/order/create-payout",
-              "api-reference/order/status",
-              "api-reference/order/pay-link",
-              "api-reference/order/order-status"
-            ]
-          },
-          {
-            "group": "Symbols",
-            "pages": [
-              "api-reference/symbols/support-symbols"
-            ]
-          },
-          {
-            "group": "Webhooks",
-            "pages": [
-              "api-reference/webhooks/overview",
-              "api-reference/webhooks/events"
+            "tab": "API 参考",
+            "groups": [
+              {
+                "group": "概述",
+                "pages": [
+                  "zh/api-reference/overview",
+                  "zh/api-reference/authentication",
+                  "zh/api-reference/errors"
+                ]
+              },
+              {
+                "group": "订单",
+                "pages": [
+                  "zh/api-reference/order/create-collection",
+                  "zh/api-reference/order/create-payout",
+                  "zh/api-reference/order/status",
+                  "zh/api-reference/order/pay-link",
+                  "zh/api-reference/order/order-status"
+                ]
+              },
+              {
+                "group": "代币",
+                "pages": [
+                  "zh/api-reference/symbols/support-symbols"
+                ]
+              },
+              {
+                "group": "Webhook",
+                "pages": [
+                  "zh/api-reference/webhooks/overview",
+                  "zh/api-reference/webhooks/events"
+                ]
+              }
             ]
           }
         ]
