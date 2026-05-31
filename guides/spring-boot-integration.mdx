@@ -1,0 +1,281 @@
+---
+title: "Spring Boot Integration with XPayLabs Java SDK"
+sidebarTitle: "Spring Boot Integration"
+description: "Integrate crypto payments into your Spring Boot application using the official XPayLabs Java SDK. Includes Maven setup, configuration, webhook handling, and full API examples."
+---
+
+The XPayLabs Java SDK (`xpay-java-sdk`) provides a comprehensive client for the XPayLabs API, designed to work seamlessly with Spring Boot applications. Source code: [https://github.com/yan253319066/XPayLabs-java-sdk](https://github.com/yan253319066/XPayLabs-java-sdk)
+
+## Installation
+
+Add the Maven dependency to your `pom.xml`:
+
+```xml
+<dependency>
+  <groupId>io.xpay</groupId>
+  <artifactId>xpay-java-sdk</artifactId>
+  <version>0.1.0</version>
+</dependency>
+```
+
+For Gradle:
+
+```groovy
+implementation 'io.xpay:xpay-java-sdk:0.1.0'
+```
+
+## Configuration
+
+Configure the SDK with your merchant token and API secret:
+
+```java
+import io.xpay.sdk.XPay;
+import io.xpay.sdk.XPayConfig;
+
+@Configuration
+public class XPayConfigBean {
+
+  @Bean
+  public XPay xPayClient() {
+    XPayConfig config = XPayConfig.builder()
+        .apiKey("your-merchant-token")
+        .apiSecret("your-api-secret")
+        .baseUrl("http://your-gateway:3010")
+        .connectTimeout(30000)
+        .readTimeout(30000)
+        .build();
+
+    return new XPay(config);
+  }
+}
+```
+
+| Property | Required | Description |
+|---|---|---|
+| `apiKey` | Yes | Merchant token |
+| `apiSecret` | Yes | API secret for HMAC signing |
+| `baseUrl` | No | Gateway base URL (default: `https://api.xpaylabs.com`) |
+| `connectTimeout` | No | Connection timeout in ms (default: 30000) |
+| `readTimeout` | No | Read timeout in ms (default: 30000) |
+
+## Core API Methods
+
+### Create a Collection Order
+
+```java
+import io.xpay.sdk.model.request.CollectionRequest;
+import io.xpay.sdk.model.response.ApiResponse;
+import io.xpay.sdk.model.response.CollectionData;
+
+@RestController
+public class PaymentController {
+
+  private final XPay xpay;
+
+  public PaymentController(XPay xpay) {
+    this.xpay = xpay;
+  }
+
+  public CollectionData createPayment(String uid, String amount) throws Exception {
+    CollectionRequest request = CollectionRequest.builder()
+        .amount(50.0)
+        .symbol("USDT")
+        .chain("TRON")
+        .orderId("order-" + System.currentTimeMillis())
+        .uid(uid)
+        .build();
+
+    ApiResponse<CollectionData> response = xpay.createCollection(request);
+
+    if (response.getCode() != 200) {
+      throw new RuntimeException("Collection failed: " + response.getMsg());
+    }
+
+    return response.getData();
+    // CollectionData fields: address, amount, symbol, chain, uid, orderId, expiredTime
+  }
+}
+```
+
+### Create a Payout
+
+```java
+import io.xpay.sdk.model.request.PayoutRequest;
+import io.xpay.sdk.model.response.PayoutData;
+
+public PayoutData sendPayout(String uid, String amount, String receiveAddress) throws Exception {
+  PayoutRequest request = PayoutRequest.builder()
+      .amount(100.0)
+      .symbol("USDT")
+      .chain("TRON")
+      .orderId("payout-" + System.currentTimeMillis())
+      .uid(uid)
+      .receiveAddress(receiveAddress)
+      .build();
+
+  ApiResponse<PayoutData> response = xpay.createPayout(request);
+  return response.getData();
+}
+```
+
+### Query Order Status
+
+```java
+import io.xpay.sdk.model.response.OrderDetails;
+
+public OrderDetails getStatus(String orderId) throws Exception {
+  ApiResponse<OrderDetails> response = xpay.getOrderStatus(orderId);
+  return response.getData();
+  // OrderDetails fields: orderId, orderType, status, amount, actualAmount,
+  //   transaction (chain, symbol, txid, from, to, amount, confirmedNum, ...)
+}
+```
+
+### Get Supported Symbols
+
+```java
+import io.xpay.sdk.model.response.SupportedSymbol;
+
+public List<SupportedSymbol> getSymbols() throws Exception {
+  ApiResponse<List<SupportedSymbol>> response = xpay.getSupportedSymbols();
+  return response.getData();
+}
+
+// Filtered by chain and symbol
+public List<SupportedSymbol> getSymbols(String chain, String symbol) throws Exception {
+  ApiResponse<List<SupportedSymbol>> response = xpay.getSupportedSymbols(chain, symbol);
+  return response.getData();
+}
+```
+
+### Get Merchant Balance
+
+```java
+import io.xpay.sdk.model.request.MerchantBalanceRequest;
+import io.xpay.sdk.model.response.MerchantBalanceData;
+
+public MerchantBalanceData getBalance(String symbol) throws Exception {
+  MerchantBalanceRequest request = MerchantBalanceRequest.builder()
+      .symbol(symbol)
+      .build();
+
+  ApiResponse<MerchantBalanceData> response = xpay.getMerchantBalance(request);
+  return response.getData();
+  // Fields: symbol, balance, frozenBalance, totalBalance
+}
+```
+
+### Get Deposit Address for a User
+
+```java
+import io.xpay.sdk.model.request.CryptoAddressRequest;
+import io.xpay.sdk.model.response.CryptoAddressData;
+
+public CryptoAddressData getDepositAddress(String uid, String chain, String symbol) throws Exception {
+  CryptoAddressRequest request = CryptoAddressRequest.builder()
+      .chain(chain)
+      .symbol(symbol)
+      .uid(uid)
+      .build();
+
+  ApiResponse<CryptoAddressData> response = xpay.getCryptoAddress(request);
+  return response.getData();
+  // Fields: chain, symbol, address
+}
+```
+
+## Handling Webhooks
+
+The SDK provides built-in webhook signature verification and event parsing. Set up a controller to receive webhook callbacks:
+
+```java
+import io.xpay.sdk.model.webhook.WebhookEvent;
+import io.xpay.sdk.model.webhook.OrderWebhookData;
+import io.xpay.sdk.model.webhook.CollectWebhookData;
+
+@RestController
+public class WebhookController {
+
+  private final XPay xpay;
+
+  public WebhookController(XPay xpay) {
+    this.xpay = xpay;
+  }
+
+  @PostMapping("/webhook")
+  public ResponseEntity<String> handleWebhook(@RequestBody String body) {
+    WebhookEvent event = xpay.parseWebhook(body);
+
+    if (event == null) {
+      return ResponseEntity.badRequest().body("Invalid webhook signature");
+    }
+
+    switch (event.getNotifyType()) {
+      case ORDER_PENDING:
+        System.out.println("Order pending: " + ((OrderWebhookData) event.getData()).getOrderId());
+        break;
+
+      case ORDER_PENDING_CONFIRMATION:
+        System.out.println("Payment detected, awaiting confirmations");
+        break;
+
+      case ORDER_SUCCESS:
+        OrderWebhookData orderData = (OrderWebhookData) event.getData();
+        System.out.println("Order " + orderData.getOrderId() + " completed!");
+        // Fulfill the order
+        break;
+
+      case ORDER_EXPIRED:
+        System.out.println("Order expired");
+        break;
+
+      case ORDER_FAILED:
+        OrderWebhookData failedData = (OrderWebhookData) event.getData();
+        System.out.println("Order failed: " + failedData.getReason());
+        break;
+
+      case COLLECT_PENDING:
+        System.out.println("Hot-to-cold sweep initiated");
+        break;
+
+      case COLLECT_SUCCESS:
+        CollectWebhookData collectData = (CollectWebhookData) event.getData();
+        System.out.println("Collection completed! Amount: " + collectData.getCollectAmount());
+        break;
+
+      case COLLECT_FAILED:
+        CollectWebhookData failedCollect = (CollectWebhookData) event.getData();
+        System.out.println("Collection failed: " + failedCollect.getReason());
+        break;
+    }
+
+    return ResponseEntity.ok("Webhook received");
+  }
+}
+```
+
+## Error Handling
+
+The SDK throws `XPayApiException` for API errors:
+
+```java
+import io.xpay.sdk.exception.XPayApiException;
+
+try {
+  ApiResponse<PayoutData> response = xpay.createPayout(request);
+} catch (XPayApiException e) {
+  System.err.println("API Error: " + e.getMessage());
+  System.err.println("HTTP Status: " + e.getStatusCode());
+  System.err.println("Error Code: " + e.getErrorCode());
+} catch (Exception e) {
+  System.err.println("Unexpected error: " + e.getMessage());
+}
+```
+
+## Full Example
+
+See the [`XPayExample.java`](https://github.com/yan253319066/XPayLabs-java-sdk) class in the SDK repository for a complete example covering all API operations.
+
+<Tip>
+  The SDK uses HMAC-SHA256 for request signing. The `XPay` class handles this automatically — you only need to pass the request objects and it manages the `sign`, `timestamp`, and `nonce` fields internally.
+</Tip>

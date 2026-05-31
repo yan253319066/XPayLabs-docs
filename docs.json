@@ -54,6 +54,9 @@
             "pages": [
               "guides/accept-payments",
               "guides/payouts",
+              "guides/spring-boot-integration",
+              "guides/nodejs-integration",
+              "guides/ai-agents",
               "guides/testing"
             ]
           },

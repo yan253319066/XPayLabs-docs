@@ -1,0 +1,202 @@
+---
+title: "Node.js Integration with XPayLabs Node.js SDK"
+sidebarTitle: "Node.js Integration"
+description: "Integrate crypto payments into your Node.js application using the official @xpaylabs/node-sdk package. Includes npm setup, configuration, webhook handling, and full API examples."
+---
+
+The XPayLabs Node.js SDK (`@xpaylabs/node-sdk`) provides typed API bindings for TypeScript and JavaScript applications. Source code: [https://github.com/yan253319066/XPayLabs-node-sdk](https://github.com/yan253319066/XPayLabs-node-sdk)
+
+## Installation
+
+```bash
+npm install @xpaylabs/node-sdk
+```
+
+The SDK requires Node.js 14+.
+
+## Configuration
+
+```typescript
+import { XPay } from '@xpaylabs/node-sdk';
+
+const xpay = new XPay({
+  apiKey: 'your-merchant-token',
+  apiSecret: 'your-api-secret',
+  baseUrl: 'http://your-gateway:3010',
+  timeout: 30000,
+});
+```
+
+| Option | Required | Default | Description |
+|---|---|---|---|
+| `apiKey` | Yes | — | Merchant token |
+| `apiSecret` | Yes | — | API secret for HMAC signing |
+| `baseUrl` | No | `https://api.xpaylabs.com` | Gateway base URL |
+| `timeout` | No | `30000` | Request timeout in ms |
+
+## Core API Methods
+
+### Create a Collection Order
+
+```typescript
+import { XPay, CollectionRequest } from '@xpaylabs/node-sdk';
+
+const xpay = new XPay({ apiKey: '...', apiSecret: '...', baseUrl: 'http://your-gateway:3010' });
+
+async function createPayment(uid: string, amount: number) {
+  const collection = await xpay.createCollection({
+    amount,
+    symbol: 'USDT',
+    chain: 'TRON',
+    orderId: `order-${Date.now()}`,
+    uid,
+  });
+
+  return collection.data;
+  // Returns: { address, amount, symbol, chain, uid, orderId, expiredTime }
+}
+```
+
+### Create a Payout
+
+```typescript
+async function sendPayout(uid: string, amount: number, receiveAddress: string) {
+  const payout = await xpay.createPayout({
+    amount,
+    symbol: 'USDT',
+    chain: 'TRON',
+    orderId: `payout-${Date.now()}`,
+    uid,
+    receiveAddress,
+  });
+
+  return payout.data;
+  // Returns: { orderId, status, amount, symbol, chain, uid, receiveAddress }
+}
+```
+
+### Query Order Status
+
+```typescript
+async function getStatus(orderId: string) {
+  const order = await xpay.getOrderStatus(orderId);
+  return order.data;
+  // Returns: { orderId, orderType, status, amount, actualAmount, transaction }
+}
+```
+
+### Get Supported Symbols
+
+```typescript
+async function getSymbols() {
+  const symbols = await xpay.getSupportedSymbols();
+  symbols.forEach(s => {
+    console.log(`${s.symbol} on ${s.chain} (decimals: ${s.decimals})`);
+  });
+}
+
+// Filtered
+const filtered = await xpay.getSupportedSymbols('TRON', 'USDT');
+```
+
+## Handling Webhooks
+
+Use an Express.js endpoint to receive and verify webhook callbacks:
+
+```typescript
+import express from 'express';
+import { XPay } from '@xpaylabs/node-sdk';
+
+const app = express();
+app.use(express.json());
+
+const xpay = new XPay({
+  apiKey: process.env.XPAYLABS_MERCHANT_TOKEN!,
+  apiSecret: process.env.XPAYLABS_API_SECRET!,
+  baseUrl: process.env.XPAYLABS_GATEWAY_URL!,
+});
+
+app.post('/webhook', (req, res) => {
+  const body = JSON.stringify(req.body);
+  const signature = req.body.sign;
+  const timestamp = req.body.timestamp.toString();
+
+  const event = xpay.parseWebhook(body, signature, timestamp);
+
+  if (!event) {
+    return res.status(400).send('Invalid webhook signature or timestamp expired');
+  }
+
+  switch (event.notifyType) {
+    case 'ORDER_PENDING':
+      console.log(`Order ${(event.data as any).orderId} created, awaiting payment`);
+      break;
+
+    case 'ORDER_PENDING_CONFIRMATION':
+      console.log('Payment detected, awaiting confirmations');
+      break;
+
+    case 'ORDER_SUCCESS':
+      console.log(`Order ${(event.data as any).orderId} completed!`);
+      // Fulfill the order
+      break;
+
+    case 'ORDER_EXPIRED':
+      console.log('Order expired');
+      break;
+
+    case 'ORDER_FAILED':
+      console.log(`Order failed: ${(event.data as any).reason}`);
+      break;
+
+    case 'COLLECT_SUCCESS':
+      console.log(`Collection completed: ${(event.data as any).collectAmount}`);
+      break;
+  }
+
+  res.status(200).send('Webhook received');
+});
+
+app.listen(3000);
+```
+
+The webhook has built-in replay protection — events with timestamps older than 30 seconds are rejected.
+
+## Error Handling
+
+```typescript
+try {
+  const payout = await xpay.createPayout({ /* ... */ });
+} catch (error: any) {
+  console.error(`Error: ${error.message}`);
+  console.error(`HTTP Status: ${error.status}`);
+  console.error(`Error Code: ${error.code}`);
+  console.error(`Additional Data: ${error.data}`);
+}
+```
+
+## TypeScript Support
+
+The SDK ships with complete type declarations. Import the types directly:
+
+```typescript
+import {
+  XPay,
+  XPayConfig,
+  CollectionRequest,
+  PayoutRequest,
+  CollectionResponse,
+  PayoutResponse,
+  OrderDetails,
+  SupportedSymbol,
+  WebhookEvent,
+  OrderWebhookData,
+  CollectWebhookData,
+  OrderStatus,
+  WebhookNotifyType,
+} from '@xpaylabs/node-sdk';
+```
+
+<Tip>
+  The SDK handles HMAC-SHA256 signing internally — you don't need to compute signatures manually. All POST requests are automatically wrapped in the `ReqPayload` envelope with `sign`, `timestamp`, and `nonce`.
+</Tip>
