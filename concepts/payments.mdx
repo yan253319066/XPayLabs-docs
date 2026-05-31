@@ -1,12 +1,12 @@
 ---
-title: "Understanding Collection Orders — The Core of XPayLabs Payments"
+title: "Collection Orders: How Crypto Payments Work in XPayLabs"
 sidebarTitle: "Payments"
-description: "Learn how XPayLabs models payment collection: the lifecycle of a collection order from creation to on-chain confirmation, order statuses, and the PaymentAddress object."
+description: "XPayLabs collection orders generate unique deposit addresses for each transaction. Track the lifecycle from creation to on-chain confirmation with order statuses and webhook events."
 ---
 
 A **Collection Order** is the core payment primitive in XPayLabs. When a customer wants to pay you in cryptocurrency, your server creates a collection order through the API. The gateway generates a unique deposit address for that specific transaction, monitors the blockchain for incoming funds, and notifies your server when payment is confirmed.
 
-## Collection Lifecycle
+## What is the collection order lifecycle?
 
 <Steps>
   <Step title="Order Created">
@@ -26,7 +26,7 @@ A **Collection Order** is the core payment primitive in XPayLabs. When a custome
   </Step>
 </Steps>
 
-## Order Statuses
+## What order statuses does XPayLabs use?
 
 | Status | Description |
 |---|---|
@@ -37,7 +37,7 @@ A **Collection Order** is the core payment primitive in XPayLabs. When a custome
 | `EXPIRED` | Order expired without receiving payment |
 | `FAILED` | Collection or payout failed |
 
-## Collection Flow Diagram
+## How do collections flow from server to blockchain?
 
 ```
 Merchant Server          XPayLabs Gateway          Blockchain           Customer

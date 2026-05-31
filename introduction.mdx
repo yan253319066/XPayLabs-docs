@@ -1,17 +1,17 @@
 ---
-title: "XPayLabs: Self-Hosted Crypto Payment Infrastructure"
+title: "XPayLabs: Self-Hosted Crypto Payment Gateway"
 sidebarTitle: "Introduction"
-description: "XPayLabs is a self-hosted, non-custodial crypto payment infrastructure. Deploy on your own servers to accept stablecoin payments across TRON, EVM chains, and SUI with zero gateway fees."
+description: "XPayLabs is a self-hosted, non-custodial crypto payment gateway. Deploy on your own servers to accept stablecoin payments across TRON, EVM chains, and SUI with zero gateway fees."
 ---
 
-XPayLabs is a self-hosted crypto payment infrastructure that lets you accept and manage stablecoin payments across multiple blockchains through a single API. Unlike hosted payment gateways, XPayLabs runs entirely on your infrastructure — your private keys stay on your servers, your funds go directly to your wallets, and you pay zero gateway fees.
+XPayLabs is a self-hosted crypto payment infrastructure that lets you accept and manage stablecoin payments across multiple blockchains through a single API. Unlike hosted payment gateways, XPayLabs runs entirely on your infrastructure — your private keys stay on your servers, your funds go directly to your wallets, and you pay zero gateway fees. Process up to 100 transactions per second per gateway instance with no per-transaction fees — only blockchain gas costs ($0.01–$0.50 per transaction).
 
 <CardGroup cols={2}>
   <Card title="Quick Start" icon="rocket" href="/quickstart">
     Deploy your payment gateway and create your first collection in minutes
   </Card>
   <Card title="Authentication" icon="key" href="/authentication">
-    Generate API tokens and sign your requests securely
+    Generate merchant tokens and sign your requests securely
   </Card>
   <Card title="API Reference" icon="code" href="/api-reference/overview">
     Explore every endpoint, parameter, and response field
@@ -34,7 +34,7 @@ XPayLabs natively supports the following blockchain networks:
 | **Avalanche C-Chain** | ERC20 | USDT, USDC |
 | **SUI** | Native | USDC |
 
-## How It Works
+## How does XPayLabs process payments?
 
 <Steps>
   <Step title="Deploy the gateway">

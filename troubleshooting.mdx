@@ -1,16 +1,16 @@
 ---
-title: "Troubleshoot XPayLabs Gateway and Integration Issues"
+title: "Troubleshooting: XPayLabs Gateway Error Solutions"
 sidebarTitle: "Troubleshooting"
-description: "Diagnose and resolve common issues with XPayLabs — including signature errors, connection problems, scanner issues, and webhook failures."
+description: "Diagnose and fix common XPayLabs issues — HMAC signature failures, blockchain scanner problems, webhook delivery errors, Docker deployment issues, and rate limiting."
 ---
 
-This guide helps you diagnose and resolve common problems with your XPayLabs gateway deployment and API integration.
+Diagnose and resolve common problems with your XPayLabs gateway deployment and API integration. This guide covers HMAC signature errors, blockchain scanner issues, webhook delivery failures, and Docker deployment problems.
 
 ---
 
 ## API Issues
 
-### 401 — Sign Verification Failed
+### Why am I getting 401 sign verification failed?
 
 The HMAC-SHA256 signature does not match what the gateway computed.
 
@@ -37,7 +37,7 @@ const sign = crypto
 console.log(sign); // Should match what gateway expects
 ```
 
-### 400 — Validation Errors
+### Why am I getting 400 validation errors?
 
 | Message | Likely Cause |
 |---|---|
@@ -52,7 +52,7 @@ console.log(sign); // Should match what gateway expects
 
 ## Blockchain Scanner Issues
 
-### Payments Not Detected
+## Why are blockchain payments not detected?
 
 If the scanner is not detecting incoming payments:
 
@@ -62,7 +62,7 @@ If the scanner is not detecting incoming payments:
 4. **Confirm token configuration:** Verify the token contract address is correctly configured for the chain.
 5. **Check blockchain explorer:** Confirm the transaction actually exists on-chain at the expected address.
 
-### Scanner is Slow
+### Why is the scanner slow?
 
 - **RPC rate limits:** Public RPC endpoints may throttle high-frequency requests. Consider using dedicated RPC endpoints.
 - **Block time:** Different chains have different block times. TRON produces blocks every 3 seconds, Ethereum every 12 seconds.
@@ -72,14 +72,14 @@ If the scanner is not detecting incoming payments:
 
 ## Webhook Problems
 
-### Not Receiving Webhooks
+## Why am I not receiving webhooks?
 
 1. **Verify callback URL:** Check the `callback-url` in your gateway configuration.
 2. **Network accessibility:** The gateway must be able to reach your callback URL. If testing locally, use a tunneling tool like ngrok.
 3. **Check gateway logs:** `docker logs <core-container-name>` to see webhook delivery attempts.
 4. **Check your endpoint logs:** Ensure your server is listening on the correct path and returning HTTP 200.
 
-### Signature Verification Failing
+### Why is webhook signature verification failing?
 
 1. **Raw data vs. full payload:** Verify the signature over the `data` field only, not the full `NotifyPayload`.
 2. **Webhook secret mismatch:** Confirm the `webhook-secret` used for verification matches what is configured in the gateway.
@@ -89,7 +89,7 @@ If the scanner is not detecting incoming payments:
 
 ## Deployment Issues
 
-### Docker Containers Not Starting
+## Why are Docker containers not starting?
 
 ```bash
 # Check container status
@@ -105,7 +105,7 @@ Common causes:
 - Insufficient disk space
 - Missing environment variables in configuration
 
-### Gateway Not Responding
+### Why is the gateway not responding?
 
 1. **Verify container is running:** `docker compose ps` should show `Up` status.
 2. **Check port binding:** `docker compose port core 3010`

@@ -1,12 +1,12 @@
 ---
-title: "Send Crypto Payouts with XPayLabs Payout Orders"
+title: "Send Crypto Payouts: XPayLabs Payout API Guide"
 sidebarTitle: "Payouts"
-description: "Learn how to send crypto payments from your gateway wallet to external blockchain addresses using the XPayLabs payout API."
+description: "Send crypto payments from your gateway wallet to external blockchain addresses using the XPayLabs payout API. Supports TRON, EVM chains, and SUI."
 ---
 
-Payouts let you transfer funds from your gateway-managed wallet to any external blockchain address. This is useful for withdrawing collected funds, paying vendors or affiliates, or moving tokens to exchange wallets.
+Send crypto payments from your XPayLabs gateway wallet to any external blockchain address using the payout API. Supports USDT, USDC, and other stablecoins on TRON, EVM chains, and SUI.
 
-## Creating a Payout
+## How to create a payout
 
 Call `POST /v1/order/createPayout` with the destination address, amount, symbol, and chain:
 
@@ -88,7 +88,7 @@ If the address format is invalid, the API returns `"ReceiveAddress error"`.
 
 ---
 
-## Payout Status Tracking
+## How to track payout status
 
 After creating a payout, track its status using the order status endpoint:
 
@@ -110,7 +110,7 @@ if (status.transaction) {
 }
 ```
 
-### Payout Statuses
+## What payout statuses are there?
 
 | Status | Description |
 |---|---|
@@ -121,7 +121,7 @@ if (status.transaction) {
 
 ---
 
-## Webhook Notifications
+## What webhook events do payouts trigger?
 
 Payouts also trigger webhook events:
 
@@ -134,7 +134,7 @@ Payouts also trigger webhook events:
 
 ---
 
-## Important Security Notes
+## Important security notes
 
 <Warning>
   - Blockchain transactions are irreversible. Double-check the `receiveAddress` before submitting.

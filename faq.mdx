@@ -1,10 +1,10 @@
 ---
-title: "XPayLabs FAQ — Self-Hosted Crypto Payment Infrastructure"
+title: "XPayLabs FAQ: Self-Hosted Crypto Payment Questions"
 sidebarTitle: "FAQ"
-description: "Answers to common questions about XPayLabs — from deployment and configuration to supported chains, webhooks, and security."
+description: "Answers to common questions about XPayLabs — deployment, supported blockchains, API integration, webhooks, security, and zero-fee pricing model."
 ---
 
-This page answers frequently asked questions about XPayLabs. For integration-specific questions, refer to the relevant guide or API reference page.
+Answers to frequently asked questions about XPayLabs — deployment, supported blockchains, API integration, webhooks, security, and pricing. For integration-specific questions, refer to the relevant guide or API reference page.
 
 ## General
 
@@ -41,7 +41,7 @@ This page answers frequently asked questions about XPayLabs. For integration-spe
 ## API & Integration
 
 <Accordion title="What authentication does the API use?">
-  All requests are authenticated using HMAC-SHA256 request signing. You configure a merchant token in the gateway, and each API request includes a signature computed over the request payload. No API keys are transmitted over the network.
+  All requests are authenticated using HMAC-SHA256 request signing. You configure a merchant token in the gateway, and each API request includes a signature computed over the request payload. No merchant tokens are transmitted over the network.
 </Accordion>
 
 <Accordion title="How do I create a payment?">

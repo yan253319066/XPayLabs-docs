@@ -1,18 +1,18 @@
 ---
-title: "XPayLabs Webhooks — Real-Time Blockchain Payment Notifications"
+title: "Webhooks: Real-Time Crypto Payment Notifications"
 sidebarTitle: "Webhooks"
-description: "XPayLabs sends signed HTTP callbacks to your server when on-chain payment events occur. Learn how webhooks work, the payload format, and how to verify signatures."
+description: "XPayLabs webhooks deliver real-time notifications for order and collection status changes. Configure callback URLs and verify HMAC signatures for secure integration."
 ---
 
 Webhooks are the primary way your server learns about payment events in real-time. Instead of polling the gateway API, you register a callback URL and XPayLabs sends signed `POST` requests whenever an order or collection changes state.
 
-## How Webhooks Work
+## How do webhooks work?
 
 1. You configure a `callback-url` and `webhook-secret` in the gateway configuration.
 2. When an event occurs (e.g., a payment is detected), the gateway constructs a `NotifyPayload` and sends it to your URL.
 3. Your server verifies the HMAC-SHA256 signature and processes the event.
 
-## Payload Structure
+## What is the webhook payload format?
 
 Every webhook follows the `NotifyPayload` format:
 
@@ -24,7 +24,7 @@ Every webhook follows the `NotifyPayload` format:
 | `notifyType` | string | The event type identifier |
 | `data` | object | The event payload (NotifyOrder or related object) |
 
-## Event Types
+## What webhook event types are available?
 
 ### Order Events
 
@@ -52,7 +52,7 @@ Every webhook includes a `sign` field computed as:
 sign = HEX(HMAC-SHA256(JSON.stringify(data), webhook_secret))
 ```
 
-You must verify this signature before acting on any webhook. See the [Webhook Reference](/api-reference/webhooks/overview#signature-verification) for code examples in Node.js, Python, and other languages.
+You must verify this signature before acting on any webhook. See the [Webhook Reference](/api-reference/webhooks/overview) for code examples in Node.js, Python, and other languages.
 
 ## Delivery Guarantees
 

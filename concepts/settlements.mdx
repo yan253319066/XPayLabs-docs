@@ -1,14 +1,12 @@
 ---
-title: "Automatic Fund Settlement — Hot-to-Cold Wallet Sweeps"
+title: "Settlements: Auto-Sweep Hot Wallet Funds to Cold Storage"
 sidebarTitle: "Settlements"
-description: "XPayLabs automatically sweeps received funds from hot wallets to your configured cold storage addresses. Learn about the settlement flow, timing, and configuration."
+description: "XPayLabs automatically sweeps received funds from hot wallets to your cold storage. Configure settlement rules and thresholds for each supported blockchain."
 ---
 
-Settlement in XPayLabs refers to the automatic transfer of received funds from your gateway's **hot wallet** (where customer payments arrive) to your **cold storage wallet** (where funds are secured for long-term holding). This process is known as a "sweep" or "collection."
+Settlement refers to the automatic transfer of received funds from your gateway's **hot wallet** (where customer payments arrive) to your **cold storage wallet** (where funds are secured for long-term holding). This process is known as a "sweep" or "collection." Unlike traditional payment processors that batch settlements on a T+2 schedule, XPayLabs settlement is a blockchain-native process — funds move directly between your wallets on-chain within minutes, not days.
 
-Unlike traditional payment processors that batch settlements to bank accounts on a T+2 schedule, XPayLabs settlement is a blockchain-native process — funds move directly between your wallets on-chain.
-
-## How Settlement Works
+## How does settlement work?
 
 ```
 Customer Payment        Hot Wallet           Cold Wallet

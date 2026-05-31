@@ -2,6 +2,7 @@
   "$schema": "https://mintlify.com/docs.json",
   "theme": "luma",
   "name": "XPayLabs",
+  "description": "Documentation for XPayLabs — self-hosted, non-custodial crypto payment infrastructure. Accept stablecoin payments on TRON, EVM chains, and SUI with zero gateway fees.",
   "colors": {
     "primary": "#54545c"
   },
@@ -106,6 +107,20 @@
         ]
       }
     ]
+  },
+  "seo": {
+    "indexing": "all",
+    "metatags": {
+      "canonical": "https://docs.xpaylabs.com",
+      "og:site_name": "XPayLabs Docs",
+      "twitter:card": "summary_large_image"
+    }
+  },
+  "metadata": {
+    "timestamp": true
+  },
+  "styling": {
+    "latex": false
   },
   "footer": {
     "socials": {

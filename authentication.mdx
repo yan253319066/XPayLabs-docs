@@ -1,14 +1,14 @@
 ---
-title: "Authenticate API Requests with HMAC-SHA256 Signatures"
+title: "HMAC-SHA256 Authentication: XPayLabs API Security"
 sidebarTitle: "Authentication"
-description: "XPayLabs uses HMAC-SHA256 request signing for API authentication. Learn how to compute the sign field with your merchant token for secure API calls."
+description: "XPayLabs authenticates every API request with HMAC-SHA256 request signing. Compute the sign field with your merchant token for secure crypto payment API calls."
 ---
 
 XPayLabs authenticates every API request using HMAC-SHA256 request signing. Unlike traditional Bearer token authentication, XPayLabs requires each request to include a cryptographic signature computed over the request payload. This ensures request integrity and prevents replay attacks.
 
 ---
 
-## How It Works
+## What is the HMAC-SHA256 signing format?
 
 Every API request includes a `ReqPayload` wrapper with four fields:
 
@@ -23,7 +23,7 @@ The `sign` field is computed using your merchant token as the HMAC secret key.
 
 ---
 
-## Computing the Signature
+## How to compute the HMAC signature
 
 ### Algorithm
 
@@ -126,7 +126,7 @@ func main() {
 
 ---
 
-## Timestamp and Nonce Requirements
+## What are the timestamp and nonce requirements?
 
 The `timestamp` and `nonce` fields prevent replay attacks:
 
@@ -135,13 +135,13 @@ The `timestamp` and `nonce` fields prevent replay attacks:
 
 ---
 
-## Verification (Server-Side)
+## How does XPayLabs verify signatures server-side?
 
 XPayLabs verifies every request by recomputing the HMAC-SHA256 signature using your stored merchant token. If the signatures don't match, or if the timestamp is outside the tolerance window, the request is rejected with a `401 Unauthorized` response.
 
 ---
 
-## Keeping Your Merchant Token Secure
+## How to keep your merchant token secure
 
 - Store your merchant token in an environment variable or secrets manager.
 - Never hardcode the token in source code or client-side applications.

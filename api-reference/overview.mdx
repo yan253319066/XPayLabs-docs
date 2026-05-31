@@ -1,7 +1,7 @@
 ---
-title: "XPayLabs REST API Reference — Concepts & Structure"
+title: "XPayLabs REST API: Crypto Payment Endpoints Reference"
 sidebarTitle: "Overview"
-description: "The XPayLabs API is a REST API with JSON request/response bodies secured by HMAC-SHA256 signing. Learn about the base URL, request format, response shape, and rate limits."
+description: "The XPayLabs API is a REST API with JSON request/response bodies secured by HMAC-SHA256 signing. Base URL, request format, response shape, and rate limits."
 ---
 
 XPayLabs exposes a RESTful API over HTTP. Every request uses a standard signed envelope format (`ReqPayload`), and every response follows a consistent structure (`R<T>`). This page covers the foundational concepts that apply across all endpoints.
@@ -72,7 +72,7 @@ All responses use the standard `R<T>` envelope:
 
 ## Authentication
 
-All requests must be signed with your merchant token using HMAC-SHA256. There are no API keys, Bearer tokens, or cookies involved. The merchant token is configured in your gateway and never transmitted over the network. See the [Authentication](/api-reference/authentication) page for the full signing reference.
+All requests must be signed with your merchant token using HMAC-SHA256. There are no Bearer tokens or cookies involved. The merchant token is configured in your gateway and never transmitted over the network. See the [Authentication](/api-reference/authentication) page for the full signing reference.
 
 ## HTTP Methods
 
