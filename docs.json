@@ -5,10 +5,10 @@
   "colors": {
     "primary": "#54545c"
   },
-  "favicon": "https://icons.duckduckgo.com/ip3/starter.mintlify.com.ico",
+  "favicon": "/images/favicon.ico",
   "logo": {
-    "light": "https://media.brand.dev/99d23bb0-7527-48e5-b2c1-71011df3a4d8.svg",
-    "dark": "https://media.brand.dev/99d23bb0-7527-48e5-b2c1-71011df3a4d8.svg"
+    "light": "/images/logo.png",
+    "dark": "/images/logo.png"
   },
   "navbar": {
     "links": [
@@ -18,7 +18,7 @@
       },
       {
         "label": "GitHub",
-        "href": "https://github.com/xpaylabs"
+        "href": "https://github.com/yan253319066/XPayLabs-docs"
       }
     ],
     "primary": {
@@ -106,8 +106,8 @@
   },
   "footer": {
     "socials": {
-      "x": "https://x.com/xpaylabs",
-      "github": "https://github.com/xpaylabs"
+      "x": "https://x.com/getciteflow",
+      "github": "https://github.com/yan253319066/XPayLabs-docs"
     }
   }
 }
