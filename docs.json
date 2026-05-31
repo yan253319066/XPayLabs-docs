@@ -8,7 +8,7 @@
   "favicon": "/images/favicon.ico",
   "logo": {
     "light": "/images/logo.png",
-    "dark": "/images/logo.png"
+    "dark": "/images/logo-dark.png"
   },
   "navbar": {
     "links": [
