@@ -1,0 +1,268 @@
+---
+title: "Webhook Endpoints API | XPayLabs Webhooks Reference"
+sidebarTitle: "Endpoints"
+description: "Manage XPayLabs webhook endpoints via API. Create, list, and delete endpoints that receive real-time payment and refund event notifications."
+---
+
+The XPayLabs webhooks API lets you programmatically manage the HTTPS endpoints that receive real-time payment event notifications. Instead of polling the API for status changes, you register a URL and subscribe to the event types relevant to your integration — XPayLabs will deliver a signed POST request to that URL whenever a matching event occurs. This reference covers creating, listing, and deleting webhook endpoints, along with how to verify the authenticity of incoming webhook requests using HMAC-SHA256 signature verification.
+
+---
+
+## POST /v1/webhooks — Create an Endpoint
+
+Register a new HTTPS endpoint to receive webhook events. On success, the response includes a `secret` field that you must use to verify incoming webhook signatures. This secret is only returned once at creation time — store it securely in your environment variables or secrets manager.
+
+### Request Body
+
+<ParamField body="url" type="string" required>
+  The publicly accessible HTTPS URL that XPayLabs will send event payloads to. HTTP URLs are not accepted. Example: `https://yourapp.com/webhooks/xpaylabs`.
+</ParamField>
+
+<ParamField body="events" type="string[]" required>
+  An array of event type strings this endpoint should subscribe to. At least one event type is required. See the [Event Types reference](/api-reference/webhooks/events) for all available values. Example: `["payment.succeeded", "refund.created"]`.
+</ParamField>
+
+<ParamField body="enabled" type="boolean">
+  Whether the endpoint should immediately begin receiving events. Defaults to `true`. Set to `false` to register the endpoint in a paused state.
+</ParamField>
+
+### cURL Example
+
+```bash
+curl -X POST https://api.xpaylabs.com/v1/webhooks \
+  -H "Authorization: Bearer sk_live_yourkey" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://yourapp.com/webhooks/xpaylabs",
+    "events": ["payment.succeeded", "payment.failed", "refund.created", "refund.succeeded"],
+    "enabled": true
+  }'
+```
+
+### Example Response
+
+```json
+{
+  "id": "wh_abc123",
+  "object": "webhook_endpoint",
+  "url": "https://yourapp.com/webhooks/xpaylabs",
+  "events": [
+    "payment.succeeded",
+    "payment.failed",
+    "refund.created",
+    "refund.succeeded"
+  ],
+  "enabled": true,
+  "secret": "whsec_3f8a2c7e1d4b9f6a0e5c8d2b7a1f4e9c3d6b0a5e8f2c7b4d1a9e6f3c0b8d5a2",
+  "created_at": "2024-06-15T09:00:00Z"
+}
+```
+
+<Warning>
+  The `secret` field is only returned once at creation time and will never be shown again. Copy it immediately and store it in a secure location such as an environment variable or secrets manager. If you lose the secret, you must delete the endpoint and create a new one.
+</Warning>
+
+---
+
+## GET /v1/webhooks — List Endpoints
+
+Retrieve a list of all webhook endpoints registered on your account, including their current configuration and enabled status. The `secret` field is **not** included in list responses.
+
+### cURL Example
+
+```bash
+curl -X GET https://api.xpaylabs.com/v1/webhooks \
+  -H "Authorization: Bearer sk_live_yourkey"
+```
+
+### Example Response
+
+```json
+{
+  "object": "list",
+  "data": [
+    {
+      "id": "wh_abc123",
+      "object": "webhook_endpoint",
+      "url": "https://yourapp.com/webhooks/xpaylabs",
+      "events": [
+        "payment.succeeded",
+        "payment.failed",
+        "refund.created",
+        "refund.succeeded"
+      ],
+      "enabled": true,
+      "created_at": "2024-06-15T09:00:00Z"
+    },
+    {
+      "id": "wh_def456",
+      "object": "webhook_endpoint",
+      "url": "https://yourapp.com/webhooks/payouts",
+      "events": [
+        "payout.paid",
+        "payout.failed"
+      ],
+      "enabled": false,
+      "created_at": "2024-05-10T14:22:00Z"
+    }
+  ],
+  "has_more": false
+}
+```
+
+---
+
+## DELETE /v1/webhooks/{id} — Delete an Endpoint
+
+Permanently delete a webhook endpoint. XPayLabs will immediately stop delivering events to the associated URL. This action cannot be undone.
+
+### cURL Example
+
+```bash
+curl -X DELETE https://api.xpaylabs.com/v1/webhooks/wh_abc123 \
+  -H "Authorization: Bearer sk_live_yourkey"
+```
+
+### Example Response
+
+```json
+{
+  "id": "wh_abc123",
+  "object": "webhook_endpoint",
+  "deleted": true
+}
+```
+
+---
+
+## Signature Verification
+
+Every webhook request from XPayLabs includes an `X-XPayLabs-Signature` header that lets you confirm the request genuinely originated from XPayLabs and has not been tampered with in transit. The signature is computed as an HMAC-SHA256 digest of the string `{timestamp}.{rawBody}`, where `timestamp` is provided in the `X-XPayLabs-Timestamp` header and `rawBody` is the raw, unparsed request body bytes.
+
+**Verification algorithm:**
+
+1. Extract the `X-XPayLabs-Timestamp` and `X-XPayLabs-Signature` headers from the incoming request.
+2. Reject the request if the timestamp is more than **300 seconds** (5 minutes) in the past — this prevents replay attacks.
+3. Construct the signed string: `{timestamp}.{rawBody}`.
+4. Compute `HMAC-SHA256(signedString, secret)` using your endpoint's secret.
+5. Compare your computed digest to the value in `X-XPayLabs-Signature` using a constant-time equality check. If they match, the webhook is authentic.
+
+### Node.js
+
+```javascript
+import crypto from "crypto";
+
+export function verifyXPayLabsSignature(req, secret) {
+  const timestamp = req.headers["x-xpaylabs-timestamp"];
+  const signature = req.headers["x-xpaylabs-signature"];
+
+  if (!timestamp || !signature) {
+    throw new Error("Missing signature headers");
+  }
+
+  // Reject events older than 300 seconds to prevent replay attacks
+  const now = Math.floor(Date.now() / 1000);
+  if (Math.abs(now - parseInt(timestamp, 10)) > 300) {
+    throw new Error("Webhook timestamp is too old — possible replay attack");
+  }
+
+  // req.rawBody must be the raw Buffer/string before JSON.parse
+  const signedPayload = `${timestamp}.${req.rawBody}`;
+  const expectedSignature = crypto
+    .createHmac("sha256", secret)
+    .update(signedPayload, "utf8")
+    .digest("hex");
+
+  // Use timingSafeEqual to prevent timing attacks
+  const expected = Buffer.from(expectedSignature, "hex");
+  const received = Buffer.from(signature, "hex");
+
+  if (expected.length !== received.length) {
+    throw new Error("Signature verification failed");
+  }
+
+  if (!crypto.timingSafeEqual(expected, received)) {
+    throw new Error("Signature verification failed");
+  }
+
+  return true;
+}
+
+// Express.js usage example
+app.post(
+  "/webhooks/xpaylabs",
+  express.raw({ type: "application/json" }),
+  (req, res) => {
+    try {
+      verifyXPayLabsSignature(
+        { headers: req.headers, rawBody: req.body },
+        process.env.XPAYLABS_WEBHOOK_SECRET
+      );
+    } catch (err) {
+      return res.status(400).send(`Webhook verification failed: ${err.message}`);
+    }
+
+    const event = JSON.parse(req.body);
+    // Process event asynchronously...
+    res.status(200).send("ok");
+  }
+);
+```
+
+### Python
+
+```python
+import hashlib
+import hmac
+import time
+from flask import Flask, request, abort
+
+app = Flask(__name__)
+
+WEBHOOK_SECRET = "whsec_3f8a2c7e1d4b9f6a0e5c8d2b7a1f4e9c3d6b0a5e8f2c7b4d1a9e6f3c0b8d5a2"
+TOLERANCE_SECONDS = 300
+
+
+def verify_xpaylabs_signature(raw_body: bytes, headers: dict, secret: str) -> bool:
+    timestamp = headers.get("X-XPayLabs-Timestamp")
+    signature = headers.get("X-XPayLabs-Signature")
+
+    if not timestamp or not signature:
+        raise ValueError("Missing signature headers")
+
+    # Reject events older than 300 seconds to prevent replay attacks
+    now = int(time.time())
+    if abs(now - int(timestamp)) > TOLERANCE_SECONDS:
+        raise ValueError("Webhook timestamp is too old — possible replay attack")
+
+    signed_payload = f"{timestamp}.{raw_body.decode('utf-8')}"
+    expected_signature = hmac.new(
+        secret.encode("utf-8"),
+        signed_payload.encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+
+    # Use compare_digest to prevent timing attacks
+    if not hmac.compare_digest(expected_signature, signature):
+        raise ValueError("Signature verification failed")
+
+    return True
+
+
+@app.route("/webhooks/xpaylabs", methods=["POST"])
+def handle_webhook():
+    raw_body = request.get_data()
+
+    try:
+        verify_xpaylabs_signature(raw_body, request.headers, WEBHOOK_SECRET)
+    except ValueError as e:
+        abort(400, description=str(e))
+
+    event = request.get_json()
+    # Process event asynchronously...
+    return "", 200
+```
+
+<Note>
+  Always read the **raw request body bytes** before parsing JSON. Many frameworks (such as Express and Flask) will parse the body for you, but signature verification requires the original, unmodified bytes. Configure your framework to expose the raw body alongside the parsed object.
+</Note>

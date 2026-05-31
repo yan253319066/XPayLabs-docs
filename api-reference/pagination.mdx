@@ -1,0 +1,163 @@
+---
+title: "Cursor-Based Pagination for XPayLabs API List Endpoints"
+sidebarTitle: "Pagination"
+description: "XPayLabs list endpoints use cursor-based pagination. Learn the limit, after, and before parameters and how to iterate through large result sets reliably."
+---
+
+All XPayLabs list endpoints return paginated results using cursor-based pagination, which is designed for efficient and consistent traversal of large datasets. Unlike offset-based pagination, cursor pagination remains stable even when new records are inserted between page fetches — you will never skip a record or see a duplicate as you page forward. This page explains the parameters, the response envelope, and how to iterate through every record in a collection.
+
+## Pagination Parameters
+
+Pass these query parameters on any `GET` request to a list endpoint:
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `limit` | integer | `20` | Number of results to return per page. Accepted range: `1`–`100`. |
+| `after` | string | — | Cursor value. Returns results **after** (newer than) the object with this ID. Use `next_cursor` from the previous response. |
+| `before` | string | — | Cursor value. Returns results **before** (older than) the object with this ID. Useful for paginating backwards. |
+
+<Note>
+  Cursor values are opaque strings tied to a specific object's position in the result set. Do not attempt to parse, construct, or modify them — their internal format may change without notice. Always use the `next_cursor` value returned directly from a response.
+</Note>
+
+## Response Envelope
+
+Every list endpoint wraps its results in a standard envelope:
+
+```json
+{
+  "data": [
+    {
+      "id": "pay_abc123xyz",
+      "object": "payment",
+      "amount": 4999,
+      "currency": "usd",
+      "status": "succeeded",
+      "created_at": "2024-11-15T10:32:00Z"
+    },
+    {
+      "id": "pay_def456uvw",
+      "object": "payment",
+      "amount": 1200,
+      "currency": "usd",
+      "status": "succeeded",
+      "created_at": "2024-11-15T09:14:22Z"
+    }
+  ],
+  "has_more": true,
+  "next_cursor": "pay_def456uvw"
+}
+```
+
+<ResponseField name="data" type="array">
+  The array of resource objects for the current page.
+</ResponseField>
+
+<ResponseField name="has_more" type="boolean">
+  `true` if there are additional results beyond this page; `false` if this is the last page.
+</ResponseField>
+
+<ResponseField name="next_cursor" type="string">
+  The cursor to pass as the `after` parameter to fetch the next page. Present only when `has_more` is `true`.
+</ResponseField>
+
+## Ordering
+
+List results are returned in **reverse chronological order** (newest first) by default. The most recently created object appears at index `0` of `data`. You can paginate forward (toward older records) using `after`, or backward (toward newer records) using `before`.
+
+## Examples
+
+### Fetch the First Page
+
+Retrieve the 10 most recent payments:
+
+```bash
+curl "https://api.xpaylabs.com/v1/payments?limit=10" \
+  -H "Authorization: Bearer sk_test_abc123xyz"
+```
+
+Response:
+
+```json
+{
+  "data": [
+    { "id": "pay_abc123xyz", "amount": 4999, "currency": "usd", "status": "succeeded", "created_at": "2024-11-15T10:32:00Z" },
+    { "id": "pay_def456uvw", "amount": 1200, "currency": "usd", "status": "succeeded", "created_at": "2024-11-15T09:14:22Z" }
+  ],
+  "has_more": true,
+  "next_cursor": "pay_def456uvw"
+}
+```
+
+### Fetch the Next Page
+
+Use the `next_cursor` value from the previous response as the `after` parameter:
+
+```bash
+curl "https://api.xpaylabs.com/v1/payments?limit=10&after=pay_def456uvw" \
+  -H "Authorization: Bearer sk_test_abc123xyz"
+```
+
+Response:
+
+```json
+{
+  "data": [
+    { "id": "pay_ghi789rst", "amount": 8750, "currency": "usd", "status": "succeeded", "created_at": "2024-11-14T18:45:10Z" },
+    { "id": "pay_jkl012mno", "amount": 300,  "currency": "usd", "status": "failed",    "created_at": "2024-11-14T17:02:55Z" }
+  ],
+  "has_more": false,
+  "next_cursor": null
+}
+```
+
+When `has_more` is `false`, you have reached the end of the result set.
+
+### Iterate All Pages in Node.js
+
+The following example fetches every payment in your account by looping until `has_more` is `false`:
+
+```javascript
+import XPayLabs from "@xpaylabs/node";
+
+const client = new XPayLabs(process.env.XPAYLABS_SECRET_KEY);
+
+async function fetchAllPayments() {
+  const allPayments = [];
+  let cursor = null;
+  let hasMore = true;
+
+  while (hasMore) {
+    const params = { limit: 100 };
+    if (cursor) {
+      params.after = cursor;
+    }
+
+    const response = await client.payments.list(params);
+
+    allPayments.push(...response.data);
+    hasMore = response.has_more;
+    cursor = response.next_cursor ?? null;
+  }
+
+  console.log(`Fetched ${allPayments.length} payments in total.`);
+  return allPayments;
+}
+
+fetchAllPayments();
+```
+
+<Tip>
+  Use the maximum `limit` of `100` when you need to retrieve all records in a collection. Fewer round-trips means faster completion and less chance of hitting rate limits.
+</Tip>
+
+## Paginating Backwards
+
+Pass a `before` cursor to retrieve the page of results that precedes a known object. This is useful when you want to refresh a page of results you previously displayed and need to check for records inserted since your last fetch:
+
+```bash
+curl "https://api.xpaylabs.com/v1/payments?limit=10&before=pay_abc123xyz" \
+  -H "Authorization: Bearer sk_test_abc123xyz"
+```
+
+This returns up to 10 payments that are **newer** than `pay_abc123xyz`.

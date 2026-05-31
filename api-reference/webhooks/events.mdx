@@ -1,0 +1,198 @@
+---
+title: "XPayLabs Webhook Event Types | All Events API Reference"
+sidebarTitle: "Event Types"
+description: "Complete reference for all XPayLabs webhook event types — payment, refund, and payout events — with envelope structure and example payloads."
+---
+
+XPayLabs sends POST requests to your registered webhook endpoints whenever an event occurs in your account. Each request contains a structured event object that wraps the affected resource — a Payment, Refund, or Payout — along with metadata about the event itself. Your endpoint must respond with HTTP `200` within **10 seconds** to acknowledge receipt; if it does not, XPayLabs will retry delivery with exponential backoff for up to 72 hours.
+
+---
+
+## Event Envelope
+
+Every webhook request body conforms to the following envelope structure regardless of event type.
+
+<ResponseField name="id" type="string">
+  Unique identifier for this event. Use this field to deduplicate events in your handler — XPayLabs may occasionally deliver the same event more than once. Example: `evt_abc123`.
+</ResponseField>
+
+<ResponseField name="type" type="string">
+  The event type string that identifies what happened. Example: `"payment.succeeded"`. See the [Event Types table](#event-types) below for all possible values.
+</ResponseField>
+
+<ResponseField name="created_at" type="string">
+  ISO 8601 timestamp of when the event was created on XPayLabs servers. Example: `"2024-06-15T10:31:00Z"`.
+</ResponseField>
+
+<ResponseField name="data" type="object">
+  A container object holding the resource affected by this event.
+
+  <Expandable title="data fields">
+    <ResponseField name="data.object" type="object">
+      The full resource object at the time the event was generated. This will be a Payment, Refund, or Payout object depending on the event type. The `object` field inside this resource indicates its type (e.g., `"payment"`, `"refund"`, `"payout"`).
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="livemode" type="boolean">
+  `true` if the event was generated in your live environment; `false` if it was generated using test API keys. Always check this field if your handler processes both live and test events.
+</ResponseField>
+
+---
+
+## Event Types
+
+The table below lists every event type XPayLabs can send, a description of when it fires, and the type of object contained in `data.object`.
+
+| Event Type | Description | `data.object` Type |
+|---|---|---|
+| `payment.succeeded` | A payment was captured and funds are being settled. | Payment |
+| `payment.failed` | A payment attempt failed (e.g., card declined, insufficient funds). | Payment |
+| `payment.canceled` | A payment was canceled before capture. | Payment |
+| `refund.created` | A refund was created and is pending processing. | Refund |
+| `refund.succeeded` | A refund was processed successfully and funds are being returned to the customer. | Refund |
+| `refund.failed` | A refund could not be processed. Check `failure_code` on the Refund object. | Refund |
+| `payout.created` | A new payout to your bank account was created. | Payout |
+| `payout.paid` | A payout has been successfully deposited to your bank account. | Payout |
+| `payout.failed` | A payout failed to reach your bank account. | Payout |
+
+---
+
+## Example Payloads
+
+### `payment.succeeded`
+
+Sent when a payment is fully captured and funds are being settled to your account.
+
+```json
+{
+  "id": "evt_abc123",
+  "type": "payment.succeeded",
+  "created_at": "2024-06-15T10:31:00Z",
+  "livemode": true,
+  "data": {
+    "object": {
+      "id": "pay_abc123xyz",
+      "object": "payment",
+      "amount": 9900,
+      "currency": "usd",
+      "status": "succeeded",
+      "description": "Order #1042 — Acme Wireless Headphones",
+      "customer_id": "cus_def456",
+      "payment_method": "pm_ghi789",
+      "capture_method": "automatic",
+      "failure_code": null,
+      "metadata": {
+        "order_id": "ord_1042"
+      },
+      "created_at": "2024-06-15T10:30:45Z"
+    }
+  }
+}
+```
+
+### `payment.failed`
+
+Sent when a payment attempt is declined or otherwise fails. The `failure_code` field on the Payment object contains a machine-readable reason.
+
+```json
+{
+  "id": "evt_bcd234",
+  "type": "payment.failed",
+  "created_at": "2024-06-15T11:05:22Z",
+  "livemode": true,
+  "data": {
+    "object": {
+      "id": "pay_bcd234efg",
+      "object": "payment",
+      "amount": 4500,
+      "currency": "usd",
+      "status": "failed",
+      "description": "Order #1043 — Monthly Subscription",
+      "customer_id": "cus_hij012",
+      "payment_method": "pm_klm345",
+      "capture_method": "automatic",
+      "failure_code": "card_declined",
+      "metadata": {
+        "order_id": "ord_1043",
+        "retry_attempt": "1"
+      },
+      "created_at": "2024-06-15T11:05:18Z"
+    }
+  }
+}
+```
+
+### `refund.succeeded`
+
+Sent when a refund has been successfully processed and funds are being returned to the customer.
+
+```json
+{
+  "id": "evt_cde345",
+  "type": "refund.succeeded",
+  "created_at": "2024-06-15T14:20:10Z",
+  "livemode": true,
+  "data": {
+    "object": {
+      "id": "ref_xyz789abc",
+      "object": "refund",
+      "payment_id": "pay_abc123xyz",
+      "amount": 9900,
+      "currency": "usd",
+      "status": "succeeded",
+      "reason": "requested_by_customer",
+      "failure_code": null,
+      "metadata": {
+        "order_id": "ord_1042",
+        "support_ticket": "tkt_55123"
+      },
+      "created_at": "2024-06-15T14:15:00Z"
+    }
+  }
+}
+```
+
+### `payout.paid`
+
+Sent when a payout has been successfully deposited to your bank account.
+
+```json
+{
+  "id": "evt_def456",
+  "type": "payout.paid",
+  "created_at": "2024-06-17T08:00:00Z",
+  "livemode": true,
+  "data": {
+    "object": {
+      "id": "po_abc987zyx",
+      "object": "payout",
+      "amount": 158400,
+      "currency": "usd",
+      "status": "paid",
+      "arrival_date": "2024-06-17",
+      "description": "XPayLabs automatic payout",
+      "destination": "ba_jkl678",
+      "failure_code": null,
+      "metadata": {},
+      "created_at": "2024-06-14T00:00:00Z"
+    }
+  }
+}
+```
+
+---
+
+## Best Practices
+
+<Note>
+  Subscribe only to the event types your integration actually needs. Subscribing to all events can generate unnecessary noise in your handler, increase the risk of processing errors, and make it harder to reason about your webhook logic. Create separate endpoints for distinct concerns — for example, one endpoint for payment events and another for payout events.
+</Note>
+
+**Acknowledge quickly, process asynchronously.** Your endpoint must return HTTP `200` within 10 seconds. For any processing that takes longer — database writes, sending emails, triggering downstream APIs — enqueue the event payload and return `200` immediately. Process the payload in a background worker.
+
+**Use `event.id` for deduplication.** XPayLabs guarantees *at-least-once* delivery, meaning the same event may arrive more than once under rare conditions such as network timeouts. Store processed event IDs (e.g., `evt_abc123`) in your database and check for duplicates before taking action.
+
+<Tip>
+  During development and testing, use the XPayLabs Dashboard's **webhook simulator** to send test events to your local server (via a tunneling tool such as ngrok) without processing real transactions. Switch to your live endpoint secret when you deploy to production.
+</Tip>

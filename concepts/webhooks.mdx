@@ -1,0 +1,243 @@
+---
+title: "XPayLabs Webhooks: Real-Time Payment Event Notifications"
+sidebarTitle: "Webhooks"
+description: "XPayLabs sends HTTP POST requests to your endpoint when payment events occur. Learn how to register endpoints, verify signatures, and handle events."
+---
+
+Webhooks allow your application to receive real-time notifications whenever something important happens in your XPayLabs account — a payment succeeds, a refund is processed, or a payout is sent. Instead of repeatedly polling the XPayLabs API to check for state changes (which wastes resources and introduces latency), you register an HTTPS endpoint on your server and XPayLabs delivers event data to it the moment an event occurs. This makes webhooks the most reliable and efficient way to keep your application in sync with payment activity.
+
+## Supported Events
+
+XPayLabs emits the following event types. You can subscribe to all events or select only the ones relevant to your integration.
+
+| Event | Triggered when |
+|---|---|
+| `payment.succeeded` | A payment is authorized and captured successfully. |
+| `payment.failed` | A payment is declined or encounters a processing error. |
+| `payment.canceled` | A payment is canceled before capture. |
+| `refund.created` | A refund is initiated for a payment. |
+| `refund.succeeded` | A refund is confirmed and the funds are returned to the customer. |
+| `refund.failed` | A refund could not be processed and the funds were not returned. |
+| `payout.created` | A settlement batch has been created and a bank transfer is being prepared. |
+| `payout.paid` | A settlement payout is successfully transferred to your bank account. |
+| `payout.failed` | A settlement payout transfer failed and funds were not deposited to your bank. |
+
+## Registering an Endpoint
+
+You can register a webhook endpoint through the Dashboard or via the API.
+
+<Steps>
+  <Step title="Open Webhook Settings">
+    In the Dashboard, navigate to **Developers → Webhooks** and click **Add endpoint**.
+  </Step>
+  <Step title="Enter your endpoint URL">
+    Provide the full HTTPS URL of the endpoint on your server that will receive events (e.g., `https://yourapp.com/webhooks/xpaylabs`). XPayLabs does not support plain HTTP endpoints in live mode.
+  </Step>
+  <Step title="Select events to listen for">
+    Choose the specific event types you want delivered to this endpoint, or select **Receive all events**. You can update this selection at any time.
+  </Step>
+  <Step title="Save and copy your signing secret">
+    After saving, XPayLabs generates a **signing secret** for this endpoint (e.g., `whsec_k9Lm3xTqR2pN8vYcZ1bA`). Copy and store it securely — you will use it to verify incoming webhook signatures. It is only shown once.
+  </Step>
+</Steps>
+
+To register an endpoint via the API instead:
+
+```bash
+curl -X POST https://api.xpaylabs.com/v1/webhooks \
+  -H "Authorization: Bearer sk_test_abc123" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://yourapp.com/webhooks/xpaylabs",
+    "events": ["payment.succeeded", "payment.failed", "refund.succeeded"]
+  }'
+```
+
+## Webhook Payload
+
+When an event occurs, XPayLabs sends an HTTP POST request to your endpoint with a JSON body. The payload always follows this structure:
+
+- **`id`** — A unique identifier for the event itself (not the payment).
+- **`type`** — The event type string (e.g., `payment.succeeded`).
+- **`created_at`** — When the event was generated.
+- **`data.object`** — The full XPayLabs object that triggered the event (a Payment, Refund, or Payout object).
+
+The following is an example payload for a `payment.succeeded` event:
+
+```json
+{
+  "id": "evt_3Kp7nWxQm1rT9uVc",
+  "type": "payment.succeeded",
+  "created_at": "2024-11-14T10:23:47Z",
+  "data": {
+    "object": {
+      "id": "pay_abc123xyz",
+      "object": "payment",
+      "amount": 4999,
+      "currency": "usd",
+      "status": "succeeded",
+      "payment_method": {
+        "type": "card",
+        "card": {
+          "brand": "visa",
+          "last4": "4242",
+          "exp_month": 12,
+          "exp_year": 2027
+        }
+      },
+      "metadata": {
+        "order_id": "order_8821"
+      },
+      "created_at": "2024-11-14T10:23:45Z"
+    }
+  }
+}
+```
+
+## Signature Verification
+
+<Warning>
+  Always verify the `X-XPayLabs-Signature` header before processing any webhook payload. Without verification, your endpoint could be spoofed by a malicious actor sending fake event data. Never trust and act on a webhook payload that you have not cryptographically verified.
+</Warning>
+
+XPayLabs signs every webhook request using HMAC-SHA256. The `X-XPayLabs-Signature` header contains a timestamp and a hex-encoded signature in the following format:
+
+```
+t=1700000627,v1=3d7f2a9b1c4e8f0a6b3d5e2f9c1a4b7d0e3f6a9c2b5e8d1f4a7c0b3e6d9f2a5
+```
+
+To verify the signature, concatenate the timestamp with the raw request body, then compute an HMAC-SHA256 using your endpoint's signing secret. Compare your computed signature against the `v1` value in the header.
+
+<Accordion title="Verify in Node.js">
+
+```javascript
+const crypto = require('crypto');
+
+function verifyWebhookSignature(rawBody, signatureHeader, signingSecret) {
+  const parts = signatureHeader.split(',');
+  const timestamp = parts.find(p => p.startsWith('t=')).split('=')[1];
+  const receivedSig = parts.find(p => p.startsWith('v1=')).split('=')[1];
+
+  // Reject webhooks older than 5 minutes to prevent replay attacks
+  const tolerance = 5 * 60; // seconds
+  const now = Math.floor(Date.now() / 1000);
+  if (Math.abs(now - parseInt(timestamp, 10)) > tolerance) {
+    throw new Error('Webhook timestamp is too old.');
+  }
+
+  const signedPayload = `${timestamp}.${rawBody}`;
+  const expectedSig = crypto
+    .createHmac('sha256', signingSecret)
+    .update(signedPayload, 'utf8')
+    .digest('hex');
+
+  if (!crypto.timingSafeEqual(Buffer.from(expectedSig), Buffer.from(receivedSig))) {
+    throw new Error('Invalid webhook signature.');
+  }
+
+  return true;
+}
+
+// Express.js example
+app.post('/webhooks/xpaylabs', express.raw({ type: 'application/json' }), (req, res) => {
+  const sigHeader = req.headers['x-xpaylabs-signature'];
+  const signingSecret = 'whsec_k9Lm3xTqR2pN8vYcZ1bA';
+
+  try {
+    verifyWebhookSignature(req.body.toString(), sigHeader, signingSecret);
+  } catch (err) {
+    return res.status(400).send(`Webhook verification failed: ${err.message}`);
+  }
+
+  const event = JSON.parse(req.body);
+  // Process event asynchronously...
+  res.status(200).send('OK');
+});
+```
+
+</Accordion>
+
+<Accordion title="Verify in Python">
+
+```python
+import hashlib
+import hmac
+import time
+from flask import Flask, request, abort
+
+app = Flask(__name__)
+
+SIGNING_SECRET = 'whsec_k9Lm3xTqR2pN8vYcZ1bA'
+TIMESTAMP_TOLERANCE = 300  # 5 minutes in seconds
+
+def verify_webhook_signature(raw_body: bytes, signature_header: str, secret: str) -> bool:
+    parts = dict(item.split('=', 1) for item in signature_header.split(','))
+    timestamp = parts.get('t')
+    received_sig = parts.get('v1')
+
+    if not timestamp or not received_sig:
+        raise ValueError('Malformed signature header.')
+
+    # Reject stale webhooks
+    if abs(time.time() - int(timestamp)) > TIMESTAMP_TOLERANCE:
+        raise ValueError('Webhook timestamp is too old.')
+
+    signed_payload = f"{timestamp}.{raw_body.decode('utf-8')}"
+    expected_sig = hmac.new(
+        secret.encode('utf-8'),
+        signed_payload.encode('utf-8'),
+        hashlib.sha256
+    ).hexdigest()
+
+    if not hmac.compare_digest(expected_sig, received_sig):
+        raise ValueError('Invalid webhook signature.')
+
+    return True
+
+@app.route('/webhooks/xpaylabs', methods=['POST'])
+def handle_webhook():
+    sig_header = request.headers.get('X-XPayLabs-Signature', '')
+    raw_body = request.get_data()
+
+    try:
+        verify_webhook_signature(raw_body, sig_header, SIGNING_SECRET)
+    except ValueError as e:
+        abort(400, description=str(e))
+
+    event = request.get_json()
+    # Process event asynchronously...
+    return '', 200
+```
+
+</Accordion>
+
+## Retry Policy
+
+If your endpoint returns a non-2xx HTTP status code, or if the request times out (XPayLabs waits up to 30 seconds for a response), XPayLabs considers the delivery a failure and will retry.
+
+| Attempt | Delay after previous attempt |
+|---|---|
+| 1st retry | ~5 minutes |
+| 2nd retry | ~30 minutes |
+| 3rd retry | ~2 hours |
+| 4th retry | ~8 hours |
+| 5th retry | ~16 hours |
+
+After five failed attempts (~24 hours total), XPayLabs stops retrying and marks the event as **failed**. You can manually replay individual failed events from the Dashboard under **Developers → Webhooks → Event log**, or by calling `POST /v1/webhooks/events/{event_id}/retry`.
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Respond immediately" icon="bolt">
+    Return a `200 OK` response as fast as possible — before doing any heavy processing. XPayLabs waits up to 30 seconds, but slow responses increase the chance of a false timeout and unnecessary retries.
+  </Card>
+  <Card title="Process asynchronously" icon="list-check">
+    Enqueue received events to a job queue (e.g., Redis, SQS, RabbitMQ) and process them in a background worker. This keeps your webhook handler lightweight and resilient.
+  </Card>
+  <Card title="Handle duplicates idempotently" icon="copy">
+    Due to retries, you may receive the same event more than once. Use the event `id` field as an idempotency key in your processing logic to ensure you don't charge, fulfill, or refund the same order twice.
+  </Card>
+  <Card title="Monitor your event log" icon="chart-line">
+    Regularly review the **Event log** in the Dashboard to spot failed deliveries early. Set up alerting if your endpoint failure rate rises above a threshold.
+  </Card>
+</CardGroup>

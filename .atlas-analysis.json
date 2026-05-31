@@ -1,0 +1,105 @@
+{
+  "projectType": "saas",
+  "projectName": "XPayLabs",
+  "projectDescription": "XPayLabs is a payment infrastructure platform that enables businesses to accept, process, and manage payments globally through a unified API.",
+  "theme": "luma",
+  "primaryColor": "#54545c",
+  "lightColor": null,
+  "darkColor": null,
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "authentication"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/payments",
+              "concepts/settlements",
+              "concepts/webhooks",
+              "concepts/errors"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/accept-payments",
+              "guides/refunds",
+              "guides/payouts",
+              "guides/testing"
+            ]
+          },
+          {
+            "group": "Support",
+            "pages": [
+              "faq",
+              "troubleshooting"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "api-reference/overview",
+              "api-reference/authentication",
+              "api-reference/pagination"
+            ]
+          },
+          {
+            "group": "Payments",
+            "pages": [
+              "api-reference/payments/create",
+              "api-reference/payments/retrieve",
+              "api-reference/payments/list"
+            ]
+          },
+          {
+            "group": "Refunds",
+            "pages": [
+              "api-reference/refunds/create",
+              "api-reference/refunds/retrieve"
+            ]
+          },
+          {
+            "group": "Webhooks",
+            "pages": [
+              "api-reference/webhooks/overview",
+              "api-reference/webhooks/events"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Global payment acceptance via unified API",
+    "Real-time payment processing and settlement",
+    "Webhook notifications for payment events",
+    "Refunds and dispute management",
+    "Payout management to merchants and vendors",
+    "Test mode for safe integration development",
+    "Detailed transaction reporting and reconciliation"
+  ],
+  "publicApiSurface": [
+    "POST /payments — Create a payment",
+    "GET /payments/{id} — Retrieve a payment",
+    "GET /payments — List payments",
+    "POST /refunds — Create a refund",
+    "GET /refunds/{id} — Retrieve a refund",
+    "POST /payouts — Create a payout",
+    "GET /webhooks — List webhook endpoints",
+    "POST /webhooks — Register a webhook endpoint"
+  ]
+}

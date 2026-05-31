@@ -1,0 +1,253 @@
+---
+title: "XPayLabs FAQ: Payments, Accounts, and Integrations"
+sidebarTitle: "FAQ"
+description: "Answers to the most common questions about XPayLabs — from account setup and payment methods to settlements, refunds, disputes, and API integration."
+---
+
+This page answers the most frequently asked questions about XPayLabs. Whether you're just getting started, integrating payments into your app, or managing payouts and disputes, you'll find clear answers below. If you don't see your question here, reach out to [support@xpaylabs.com](mailto:support@xpaylabs.com).
+
+## Account & Setup
+
+<Accordion title="How do I create an XPayLabs account?">
+  Visit [xpaylabs.com/signup](https://xpaylabs.com/signup) and complete the registration form with your business email address, company name, and country of operation. After you submit the form, XPayLabs sends a verification email to the address you provided. Click the link in that email to activate your account and proceed to the onboarding checklist in the Dashboard.
+</Accordion>
+
+<Accordion title="What documents do I need for identity verification?">
+  The documents required depend on your business type:
+
+  - **Sole traders / individuals:** a government-issued photo ID (passport or national ID card) and proof of address dated within the last three months (bank statement or utility bill).
+  - **Registered companies:** the above ID for each beneficial owner who holds 25% or more of the company, plus your certificate of incorporation and, where applicable, a VAT registration number.
+
+  Upload all documents directly in the **Settings → Verification** section of the Dashboard. Accepted file formats are PDF, JPG, and PNG (max 10 MB per file).
+</Accordion>
+
+<Accordion title="How long does account verification take?">
+  Most accounts are verified within **1–2 business days**. During busy periods it may take up to 3 business days. You receive an email notification as soon as your verification is approved or if additional information is needed. You can check the current status at any time in **Settings → Verification** in the Dashboard.
+</Accordion>
+
+<Accordion title="Can I use XPayLabs in my country?">
+  XPayLabs is available in over 50 countries across North America, Europe, Asia-Pacific, and Latin America. To check whether your country is supported, visit the [Supported Countries](https://xpaylabs.com/countries) page or go to **Settings → Business Details** in the Dashboard — unsupported countries are greyed out. If your country is not yet supported, you can join the waitlist and XPayLabs will notify you when coverage expands to your region.
+</Accordion>
+
+---
+
+## Payments
+
+<Accordion title="What payment methods does XPayLabs support?">
+  XPayLabs supports a broad range of payment methods out of the box:
+
+  - **Cards:** Visa, Mastercard, American Express, Discover, UnionPay, JCB
+  - **Digital wallets:** Apple Pay, Google Pay, PayPal
+  - **Bank transfers:** SEPA Direct Debit (Europe), ACH (United States), BACS (United Kingdom)
+  - **Buy Now Pay Later:** Klarna, Afterpay / Clearpay
+  - **Local methods:** iDEAL (Netherlands), Bancontact (Belgium), BLIK (Poland), PIX (Brazil), and more
+
+  Enable or disable specific methods in **Settings → Payment Methods** in the Dashboard.
+</Accordion>
+
+<Accordion title="What currencies can I accept?">
+  XPayLabs supports **135+ currencies**. You can accept payments in any supported currency regardless of your settlement currency — XPayLabs handles the conversion automatically. To see the full list of supported currencies and current conversion rates, refer to the [Currencies reference](https://xpaylabs.com/docs/currencies) in the developer documentation.
+
+  <Tip>
+    Set your **presentment currency** to match your customer's locale to improve conversion rates and reduce cart abandonment.
+  </Tip>
+</Accordion>
+
+<Accordion title="Is there a minimum or maximum transaction amount?">
+  The minimum transaction amount is **$0.50 USD** (or the equivalent in your chosen currency). There is no hard maximum for most merchants; however, transactions above $50,000 USD (or equivalent) may be subject to an additional fraud review. If your business regularly processes high-value transactions, contact [support@xpaylabs.com](mailto:support@xpaylabs.com) to discuss custom limits.
+
+  <Note>
+    All amounts are expressed in the **smallest currency unit** — for example, cents for USD. A charge of $10.00 should be sent as `amount: 1000`.
+  </Note>
+</Accordion>
+
+<Accordion title="How does 3D Secure authentication work?">
+  3D Secure (3DS) adds an extra layer of cardholder authentication — typically a one-time passcode or biometric prompt from the card issuer — before a payment is authorised. XPayLabs supports **3DS2**, which enables risk-based authentication so that low-risk transactions can be completed without any friction for the customer.
+
+  When you create a payment intent, XPayLabs automatically evaluates whether 3DS is required based on card issuer rules and your configured risk settings. If 3DS is triggered, the `payment_intent` object returns a `next_action` of type `redirect_to_url`. Redirect the customer to that URL to complete authentication, then capture the payment once the intent returns to `status: succeeded`.
+
+  You can configure 3DS preferences in **Settings → Risk & Fraud**.
+</Accordion>
+
+<Accordion title="What happens if a payment fails?">
+  When a payment fails, the API returns an error object containing a `code` field that describes the specific reason. Common failure codes include:
+
+  - `card_declined` — the card issuer rejected the charge.
+  - `insufficient_funds` — the customer's account balance is too low.
+  - `expired_card` — the card's expiry date has passed.
+  - `incorrect_cvc` — the CVC code entered was wrong.
+
+  Your integration should read the `error.code` and surface an appropriate, actionable message to the customer (for example, "Your card was declined — please try a different card"). Do not expose raw API error messages directly to end users.
+
+  Failed payments are also logged in **Dashboard → Payments** so you can review them and investigate patterns.
+</Accordion>
+
+---
+
+## Settlements & Payouts
+
+<Accordion title="When do I receive my settlement?">
+  By default, XPayLabs settles funds on a **T+2 rolling basis** — that is, two business days after each transaction is captured. For example, a payment captured on Monday is settled to your bank account on Wednesday, excluding public holidays.
+
+  If you qualify, you can apply for **same-day settlements** in **Settings → Payouts**. Eligibility is based on account history, processing volume, and risk profile.
+</Accordion>
+
+<Accordion title="What fees does XPayLabs charge?">
+  XPayLabs charges a **blended processing fee** per successful transaction. Standard pricing is:
+
+  - **Online card payments:** 1.5% + $0.20 per transaction (domestic cards)
+  - **International cards:** 2.9% + $0.20 per transaction
+  - **Digital wallets:** same as card rates
+  - **Bank transfers (ACH / SEPA):** 0.8%, capped at $5.00
+
+  Volume discounts are available for merchants processing more than $50,000 per month. Contact [sales@xpaylabs.com](mailto:sales@xpaylabs.com) for a custom quote. A full fee schedule is available at [xpaylabs.com/pricing](https://xpaylabs.com/pricing).
+</Accordion>
+
+<Accordion title="How do I change my bank account for settlements?">
+  To update your settlement bank account:
+
+  1. Go to **Settings → Payouts** in the Dashboard.
+  2. Click **Change bank account**.
+  3. Enter the new account details and confirm with your two-factor authentication code.
+
+  For security reasons, XPayLabs places a **48-hour hold** on payouts after you add a new bank account. This hold allows you to verify that the new details are correct before any funds are transferred. Existing scheduled payouts are not affected.
+
+  <Warning>
+    Never share your bank account details over email or chat. XPayLabs support staff will never ask you to provide banking information outside of the secure Dashboard.
+  </Warning>
+</Accordion>
+
+<Accordion title="Why was my payout delayed?">
+  Common reasons for a delayed payout include:
+
+  - **Account verification incomplete:** your identity or bank account verification is still pending. Check **Settings → Verification**.
+  - **Public holiday:** the T+2 settlement window excludes weekends and public holidays in your country.
+  - **Suspicious activity review:** if our risk systems flag unusual activity, payouts may be paused while the account is reviewed. You will receive an email with details.
+  - **Minimum payout threshold not met:** if your account has a minimum payout balance configured, funds accumulate until the threshold is reached.
+
+  If none of the above apply and your payout is more than 3 business days late, contact [support@xpaylabs.com](mailto:support@xpaylabs.com) with your payout ID.
+</Accordion>
+
+---
+
+## Refunds & Disputes
+
+<Accordion title="How long do refunds take?">
+  Once you issue a refund via the API or Dashboard, XPayLabs processes it immediately. The time for the funds to appear in the customer's account depends on their card issuer or bank:
+
+  - **Credit / debit cards:** 5–10 business days
+  - **Digital wallets:** 1–3 business days
+  - **Bank transfers (ACH / SEPA):** 3–5 business days
+
+  The refund appears in **Dashboard → Refunds** with a `status` of `pending` until it is confirmed by the issuer, after which it transitions to `succeeded`.
+</Accordion>
+
+<Accordion title="Can I issue a partial refund?">
+  Yes. You can issue a partial refund for any amount up to the original transaction value. Pass the `amount` field in the refund request to specify how much to return:
+
+  ```bash
+  curl -X POST https://api.xpaylabs.com/v1/refunds \
+    -H "Authorization: Bearer sk_live_YOUR_KEY" \
+    -H "Content-Type: application/json" \
+    -d '{
+      "payment_intent": "pi_abc123",
+      "amount": 500
+    }'
+  ```
+
+  In this example, `500` refunds $5.00 (amounts are always in the smallest currency unit). You can issue multiple partial refunds against the same payment as long as the total does not exceed the original captured amount.
+</Accordion>
+
+<Accordion title="What happens if a customer files a chargeback?">
+  If a customer disputes a charge with their bank, XPayLabs notifies you by email and creates a **Dispute** object in the Dashboard. You have **7 calendar days** to submit evidence supporting the legitimacy of the charge (for example, proof of delivery, customer communications, or terms of service acceptance).
+
+  To respond to a dispute:
+
+  1. Go to **Dashboard → Disputes** and open the relevant dispute.
+  2. Upload your evidence files and add a written explanation.
+  3. Click **Submit evidence** before the deadline.
+
+  If the dispute is resolved in your favour, the held funds are returned to your balance. If the customer wins, the disputed amount plus a **$15 chargeback fee** is deducted from your balance. Maintaining a chargeback rate below 0.5% is important to keep your account in good standing.
+
+  <Tip>
+    Enable **Radar fraud rules** and **3D Secure** to reduce the likelihood of chargebacks before they occur.
+  </Tip>
+</Accordion>
+
+---
+
+## Technical & Integration
+
+<Accordion title="How do I test my integration?">
+  Use your **test mode API keys** (prefixed `sk_test_`) to run transactions in the sandbox environment without moving real money. Test mode mirrors the live API exactly, so any code that works in test mode will work in production.
+
+  Use the following test card numbers to simulate different outcomes:
+
+  | Card number | Outcome |
+  |---|---|
+  | `4242 4242 4242 4242` | Payment succeeds |
+  | `4000 0000 0000 0002` | Card declined |
+  | `4000 0025 0000 3155` | 3D Secure required |
+  | `4000 0000 0000 9995` | Insufficient funds |
+
+  Use any future expiry date, any 3-digit CVC, and any billing postcode. Test mode transactions are visible in the Dashboard when you toggle **Test Mode** in the top navigation bar.
+</Accordion>
+
+<Accordion title="Where can I find my API keys?">
+  Your API keys are in **Dashboard → Developers → API Keys**. Each account has two key pairs:
+
+  - **Test keys** (prefix `sk_test_` / `pk_test_`) — use these during development and testing.
+  - **Live keys** (prefix `sk_live_` / `pk_live_`) — use these in your production environment.
+
+  <Warning>
+    Your **secret key** (`sk_`) grants full API access to your account. Never expose it in client-side code, public repositories, or logs. If you believe your secret key has been compromised, rotate it immediately from the Dashboard.
+  </Warning>
+
+  To rotate a key, click the **Roll key** button next to it. Your old key remains valid for 24 hours to give you time to deploy the new key.
+</Accordion>
+
+<Accordion title="How do I verify webhook signatures?">
+  XPayLabs signs every webhook request with an HMAC-SHA256 signature so you can confirm it originated from XPayLabs. The signature is included in the `X-XPayLabs-Signature` header as a hex digest.
+
+  To verify the signature:
+
+  1. Retrieve the raw request body **before** parsing it as JSON.
+  2. Compute `HMAC-SHA256(raw_body, webhook_secret)`.
+  3. Compare your computed digest to the value in the `X-XPayLabs-Signature` header using a constant-time comparison.
+
+  ```python
+  import hmac
+  import hashlib
+
+  def verify_signature(raw_body: bytes, secret: str, header: str) -> bool:
+      expected = hmac.new(
+          secret.encode("utf-8"),
+          raw_body,
+          hashlib.sha256
+      ).hexdigest()
+      return hmac.compare_digest(expected, header)
+  ```
+
+  Your webhook secret is displayed once when you create the endpoint in **Dashboard → Developers → Webhooks**. Store it securely — if you lose it, rotate it from the same page.
+</Accordion>
+
+<Accordion title="What should I do if I get a 429 rate limit error?">
+  A `429 Too Many Requests` response means your integration has exceeded the default limit of **100 requests per second per API key**. To handle this gracefully, implement **exponential backoff with jitter** — wait a short interval before retrying, doubling the wait time on each successive failure.
+
+  ```python
+  import time
+  import random
+  import requests
+
+  def request_with_backoff(url, headers, payload, max_retries=5):
+      for attempt in range(max_retries):
+          response = requests.post(url, headers=headers, json=payload)
+          if response.status_code != 429:
+              return response
+          wait = (2 ** attempt) + random.uniform(0, 1)
+          time.sleep(wait)
+      raise Exception("Max retries exceeded")
+  ```
+
+  You can also inspect the `X-RateLimit-Remaining` response header to monitor how many requests you have left in the current window before throttling begins. If you consistently hit rate limits, consider batching requests or contact [support@xpaylabs.com](mailto:support@xpaylabs.com) to discuss a higher limit for your account.
+</Accordion>

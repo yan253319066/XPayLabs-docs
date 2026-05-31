@@ -1,0 +1,171 @@
+---
+title: "XPayLabs REST API Reference — Concepts & Structure"
+sidebarTitle: "Overview"
+description: "The XPayLabs API is a unified REST API with JSON bodies. Learn about the base URL, versioning, request headers, response shapes, and rate limits."
+---
+
+XPayLabs exposes a RESTful API over HTTPS. Every request you send and every response you receive uses JSON, so you can integrate with any language or framework that speaks HTTP. This page covers the foundational concepts — base URL, versioning, authentication, request headers, response shapes, and operational concerns such as idempotency and rate limiting — that apply across the entire API surface.
+
+## Base URL
+
+All API requests target the following base URL:
+
+```
+https://api.xpaylabs.com/v1
+```
+
+Always use HTTPS. Requests made over plain HTTP are rejected.
+
+## Versioning
+
+The current API version is **v1**, and it is part of the URL path (e.g., `/v1/payments`). XPayLabs considers the following changes to be non-breaking and may introduce them without a version bump:
+
+- Adding new JSON fields to responses
+- Adding new optional request parameters
+- Adding new API endpoints
+
+When XPayLabs introduces a breaking change — such as removing a field or altering existing behaviour — it releases a new version (e.g., `v2`) and maintains the previous version for a deprecation window. You will receive advance notice before any version is sunset.
+
+## Authentication
+
+All requests must be authenticated with an API key passed as a Bearer token in the `Authorization` header. Test-mode keys (`sk_test_…`) and live-mode keys (`sk_live_…`) are available from your dashboard. For a complete reference on key types, scopes, and security best practices, see the [Authentication](/api-reference/authentication) page.
+
+## Request Headers
+
+Every request you make should include the following headers:
+
+| Header | Required | Value |
+|---|---|---|
+| `Content-Type` | Yes (for POST/PATCH) | `application/json` |
+| `Authorization` | Yes | `Bearer <your_api_key>` |
+| `Idempotency-Key` | No | A unique string (see [Idempotency](#idempotency)) |
+
+## Response Format
+
+All responses from the XPayLabs API are JSON objects. The shape differs depending on whether the request succeeded or failed.
+
+**Success responses** return the requested resource (or a list envelope) at the top level:
+
+```json
+{
+  "id": "pay_abc123xyz",
+  "object": "payment",
+  "amount": 4999,
+  "currency": "usd",
+  "status": "succeeded",
+  "created_at": "2024-11-15T10:32:00Z"
+}
+```
+
+**Error responses** always include an `error` object with three fields that help you identify and handle the problem programmatically:
+
+```json
+{
+  "error": {
+    "type": "invalid_request_error",
+    "code": "resource_not_found",
+    "message": "No payment with ID pay_abc123xyz exists in test mode."
+  }
+}
+```
+
+| Field | Description |
+|---|---|
+| `error.type` | High-level error category (e.g., `invalid_request_error`, `authentication_error`) |
+| `error.code` | Machine-readable code for the specific error condition |
+| `error.message` | Human-readable description of what went wrong |
+
+## HTTP Methods
+
+XPayLabs uses standard HTTP verbs to express intent:
+
+| Method | Use |
+|---|---|
+| `GET` | Retrieve a resource or list of resources |
+| `POST` | Create a new resource |
+| `PATCH` | Update an existing resource |
+| `DELETE` | Cancel or delete a resource |
+
+## Example Request and Response
+
+The following example retrieves an existing payment object using its ID:
+
+<Tabs>
+  <Tab title="cURL">
+    ```bash
+    curl https://api.xpaylabs.com/v1/payments/pay_abc123xyz \
+      -H "Authorization: Bearer sk_test_abc123xyz"
+    ```
+  </Tab>
+  <Tab title="Response">
+    ```json
+    {
+      "id": "pay_abc123xyz",
+      "object": "payment",
+      "amount": 4999,
+      "currency": "usd",
+      "status": "succeeded",
+      "description": "Order #1042",
+      "created_at": "2024-11-15T10:32:00Z",
+      "updated_at": "2024-11-15T10:32:05Z"
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Idempotency
+
+POST requests support an optional `Idempotency-Key` header. When you supply the same key on a retry, XPayLabs returns the cached response from the original request rather than executing the operation again. Cached responses are stored for **24 hours**.
+
+```bash
+curl https://api.xpaylabs.com/v1/payments \
+  -X POST \
+  -H "Authorization: Bearer sk_test_abc123xyz" \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: order_1042_attempt_1" \
+  -d '{
+    "amount": 4999,
+    "currency": "usd",
+    "payment_method": "pm_card_visa"
+  }'
+```
+
+<Tip>
+  Use idempotency keys whenever you create payments or trigger financial operations. This protects you from accidental double-charges if a network failure causes you to retry a request that already succeeded.
+</Tip>
+
+## Timestamps
+
+All timestamps across the API are returned in **ISO 8601 UTC** format:
+
+```
+2024-11-15T10:32:00Z
+```
+
+When passing timestamps as request parameters, use the same format.
+
+## Amounts and Currencies
+
+All monetary amounts are expressed in the **smallest unit of the currency** — for USD that is cents, for JPY that is yen. For example, `4999` represents $49.99 USD. The `currency` field uses lowercase [ISO 4217](https://www.iso.org/iso-4217-currency-codes.html) codes (e.g., `usd`, `eur`, `gbp`).
+
+## Pagination
+
+List endpoints return paginated results using cursor-based pagination. For full details on the `limit`, `after`, and `before` parameters and how to iterate through large result sets, see the [Pagination](/api-reference/pagination) page.
+
+## Rate Limits
+
+The default rate limit is **100 requests per second** per API key. If you exceed this limit, the API returns a `429 Too Many Requests` response containing a `Retry-After` header that tells you how many seconds to wait before retrying.
+
+```json
+{
+  "error": {
+    "type": "rate_limit_error",
+    "code": "too_many_requests",
+    "message": "You have exceeded the rate limit of 100 requests per second. Please retry after 1 second."
+  }
+}
+```
+
+<Note>
+  If your integration consistently approaches the rate limit, contact XPayLabs support to discuss an increased limit for your account.
+</Note>

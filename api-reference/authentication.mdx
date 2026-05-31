@@ -1,0 +1,123 @@
+---
+title: "Authenticating Your Requests to the XPayLabs REST API"
+sidebarTitle: "Authentication"
+description: "Authenticate with the XPayLabs API using Bearer tokens. Understand test vs. live key types, restricted scopes, 401/403 errors, and security best practices."
+---
+
+Every request you make to the XPayLabs API must include a valid API key in the `Authorization` header. XPayLabs uses Bearer token authentication — no cookies, no sessions, no OAuth flow required for server-to-server integrations. Your API key both identifies your account and determines which environment (test or live) and which resources the request can access.
+
+## API Key Types
+
+XPayLabs issues two categories of secret key, distinguished by their prefix:
+
+| Key prefix | Environment | Description |
+|---|---|---|
+| `sk_test_…` | Test | Safe for development and CI. No real money moves. All operations are simulated. |
+| `sk_live_…` | Live | Real transactions. Charges are processed against actual payment methods. Keep these secret. |
+
+<Warning>
+  Secret keys (`sk_live_…` and `sk_test_…`) must **never** be exposed in client-side code, embedded in mobile apps, or committed to version control. Anyone who obtains your live secret key can initiate real charges on your account.
+</Warning>
+
+## Header Format
+
+Pass your API key as a Bearer token in the `Authorization` header on every request:
+
+```bash
+Authorization: Bearer sk_test_abc123xyz
+```
+
+A complete example using cURL:
+
+```bash
+curl https://api.xpaylabs.com/v1/payments \
+  -H "Authorization: Bearer sk_test_abc123xyz" \
+  -H "Content-Type: application/json"
+```
+
+The API key goes directly after the `Bearer` keyword, separated by a single space. There is no additional encoding or signing required.
+
+## Where to Find Your Keys
+
+You can view, create, and revoke API keys in the XPayLabs Dashboard:
+
+1. Log in to [dashboard.xpaylabs.com](https://dashboard.xpaylabs.com).
+2. Navigate to **Developers → API Keys**.
+3. Copy your test or live secret key.
+
+The full key value is shown only once at creation time. If you lose a key, you must rotate it and replace all usages with the new key.
+
+## Scopes and Restricted Keys
+
+By default, a secret key grants full access to all resources and methods in its environment. For production integrations — especially those involving third-party services or automated pipelines — you should use **restricted keys** that limit access to only the resources and HTTP methods your integration actually needs.
+
+To create a restricted key:
+
+1. Go to **Dashboard → Developers → API Keys → Create restricted key**.
+2. Select the resource types (e.g., Payments, Refunds, Customers) and the allowed methods (read, write) for each.
+3. Copy and store the resulting key securely.
+
+Restricted keys carry the same `sk_live_…` or `sk_test_…` prefix but have a narrower permission surface. Requests that exceed the key's permitted scope return a `403` error (see [Error Responses](#error-responses) below).
+
+## Error Responses
+
+### 401 — Missing or Invalid Key
+
+The API returns `401 Unauthorized` when no API key is provided, when the key is malformed, or when the key has been revoked.
+
+```json
+{
+  "error": {
+    "type": "authentication_error",
+    "code": "invalid_api_key",
+    "message": "The API key provided is invalid or has been revoked. Check your key in the Dashboard and update your integration."
+  }
+}
+```
+
+Common causes:
+- Forgetting to include the `Authorization` header entirely
+- Passing a publishable key where a secret key is required
+- Using a key that was rotated or deleted
+
+### 403 — Insufficient Scope
+
+The API returns `403 Forbidden` when the key is valid but the operation falls outside the key's permitted scopes.
+
+```json
+{
+  "error": {
+    "type": "permission_error",
+    "code": "insufficient_scope",
+    "message": "This API key does not have permission to perform write operations on the Refunds resource. Update the key's scopes in the Dashboard."
+  }
+}
+```
+
+To resolve a `403`, either broaden the scopes on the restricted key in the Dashboard, or use a different key that has the required permissions.
+
+## Security Best Practices
+
+Following these practices protects your account and your users:
+
+- **Use environment variables.** Store API keys in environment variables (e.g., `XPAYLABS_SECRET_KEY`) rather than hard-coding them in your source files.
+
+  ```bash
+  export XPAYLABS_SECRET_KEY=sk_live_abc123xyz
+  ```
+
+  ```javascript
+  const client = new XPayLabs(process.env.XPAYLABS_SECRET_KEY);
+  ```
+
+- **Use restricted keys in production.** Grant each service or integration only the permissions it needs. A webhook processor that only reads payment data should not have write access to refunds.
+
+- **Rotate keys immediately if compromised.** If you suspect a key has been exposed — for example, it was accidentally pushed to a public repository — go to **Dashboard → API Keys**, revoke the key immediately, and issue a new one. Update all services using the old key before the revocation propagates.
+
+- **Never use secret keys in browser JavaScript.** Any code that runs in a user's browser is visible to that user. Use XPayLabs's publishable keys (`pk_test_…`, `pk_live_…`) for client-side operations and keep secret keys exclusively on your server.
+
+- **Audit key usage.** Review the request logs in **Dashboard → Developers → Logs** regularly. Unexpected spikes or requests from unfamiliar IP addresses can indicate a compromised key.
+
+<Tip>
+  In CI/CD pipelines, inject API keys through your secrets manager (e.g., GitHub Actions Secrets, AWS Secrets Manager, HashiCorp Vault) rather than storing them in pipeline configuration files.
+</Tip>

@@ -1,0 +1,106 @@
+---
+title: "XPayLabs Settlements: Batching, Timing, and Bank Payouts"
+sidebarTitle: "Settlements"
+description: "Understand how XPayLabs batches and transfers your payment proceeds to your bank account, including timing, fees, and the settlement cycle."
+---
+
+A settlement is the process by which XPayLabs transfers the net proceeds of your captured payments to your configured bank account. Settlements are distinct from payments: a payment represents a single customer transaction, while a settlement is a batch transfer that aggregates many payments, subtracts applicable fees, and sends the net amount to you in a single bank transfer. Understanding the settlement cycle helps you forecast cash flow, reconcile your books, and resolve discrepancies quickly.
+
+## Settlement Cycle
+
+XPayLabs processes settlements on a rolling **T+2** schedule, meaning funds from a successfully captured payment are typically deposited into your bank account within two business days of capture. For example, payments captured on a Monday are batched overnight and arrive in your account by Wednesday, assuming no banking holidays fall in between.
+
+<Steps>
+  <Step title="Capture">
+    A payment reaches `succeeded` status. XPayLabs marks the funds as captured and includes this payment in the next settlement batch.
+  </Step>
+  <Step title="Batching (T+0 to T+1)">
+    XPayLabs groups captured payments from the day into a settlement batch. Each batch is assigned a unique `settlement_id` (e.g., `stl_7gHkLmN2pQ`). Fees are calculated and deducted from the gross amount.
+  </Step>
+  <Step title="Bank Transfer Initiated (T+1)">
+    XPayLabs initiates an ACH or SWIFT transfer to your bank on the next business day. Your bank receives a credit entry with the settlement reference.
+  </Step>
+  <Step title="Funds Available (T+2)">
+    Your bank processes the incoming transfer and makes funds available in your account. The settlement status in XPayLabs updates to `paid`.
+  </Step>
+</Steps>
+
+<Info>
+  Settlement timing may vary slightly depending on your country, bank, and payment method. Card payments follow T+2 in most markets. ACH and bank transfer payments may have longer settlement windows (T+3 to T+5). Check your Dashboard's **Settlement Schedule** tab for the exact timeline configured for your account.
+</Info>
+
+## Rolling Reserve
+
+For newly onboarded accounts or accounts with elevated risk profiles, XPayLabs may hold a percentage of gross settlement volume in a **rolling reserve**. A rolling reserve is a temporary hold — typically 5–10% of processed volume — retained for a defined period (commonly 90 days) before being released to you. This protects against chargebacks and refunds that arrive after the initial settlement.
+
+<Accordion title="How rolling reserves work">
+  When a rolling reserve is active, your settlement report will show a line item labeled **Reserve withheld** that reduces your net payout. After the holding period expires, the reserved amount is released and appears as **Reserve released** in a subsequent settlement. You can view your current reserve balance and release schedule in the Dashboard under **Finance → Reserves**. Contact [support@xpaylabs.com](mailto:support@xpaylabs.com) if you believe your reserve requirements should be reviewed.
+</Accordion>
+
+## Settlement Report
+
+Each settlement batch comes with a detailed report that breaks down every payment included in the payout. You can download settlement reports from the Dashboard under **Finance → Settlements**, or retrieve them programmatically via `GET /v1/settlements/{id}/report`.
+
+A settlement report includes the following line items:
+
+| Line Item | Description |
+|---|---|
+| **Gross amount** | The total value of all captured payments in the batch, in your settlement currency. |
+| **Refunds** | The total amount of refunds processed during the settlement period, deducted from the gross. |
+| **Processing fees** | Per-transaction fees charged by XPayLabs (e.g., 2.9% + $0.30 per card transaction). |
+| **FX conversion fees** | Fees applied when converting from a transaction currency to your settlement currency. |
+| **Reserve withheld** | Amount held back as rolling reserve, if applicable. |
+| **Net payout** | The final amount transferred to your bank account after all deductions. |
+
+```json
+{
+  "id": "stl_7gHkLmN2pQ",
+  "object": "settlement",
+  "status": "paid",
+  "currency": "usd",
+  "gross_amount": 152340,
+  "refunds": 4999,
+  "processing_fees": 4893,
+  "fx_fees": 210,
+  "reserve_withheld": 7617,
+  "net_payout": 134621,
+  "payment_count": 38,
+  "period_start": "2024-11-14T00:00:00Z",
+  "period_end": "2024-11-14T23:59:59Z",
+  "paid_at": "2024-11-16T08:30:00Z",
+  "bank_account_last4": "9823"
+}
+```
+
+<Tip>
+  Every successful Payment object contains a `settlement_id` field once it has been included in a batch. Use this field to cross-reference individual transactions against your settlement reports for accurate reconciliation. Filter your payment records by `settlement_id` to group all transactions in a given payout.
+</Tip>
+
+## Bank Account Setup
+
+Before XPayLabs can transfer funds to you, you must configure a payout bank account. Navigate to **Dashboard → Settings → Payouts** and add your bank details. XPayLabs supports:
+
+- **ACH** for US-based bank accounts (routing number + account number)
+- **SEPA** for EUR-denominated accounts in the EU/EEA
+- **SWIFT** for international accounts outside of ACH/SEPA regions
+
+XPayLabs performs a small verification deposit (typically $0.01 or €0.01) to confirm ownership of the account before enabling live settlements. You will need to confirm the deposit amount in the Dashboard to complete verification.
+
+<Note>
+  You can configure multiple bank accounts and assign different accounts to different settlement currencies. For example, you can route USD settlements to a US bank account and EUR settlements to a European account simultaneously.
+</Note>
+
+## Currencies and FX Conversion
+
+XPayLabs settles funds in your account's **settlement currency** — the primary currency you selected when you created your account. When a customer pays in a different currency, XPayLabs applies a foreign exchange conversion at the time of capture using the mid-market rate plus a small conversion fee (typically 1%).
+
+For example, if your settlement currency is USD and a customer pays €49.99, XPayLabs converts the EUR amount to USD at the rate locked in at capture time. The converted USD amount is what appears in your settlement report. You cannot retroactively change the FX rate applied to a completed payment.
+
+<CardGroup cols={2}>
+  <Card title="Supported settlement currencies" icon="circle-dollar-to-slot">
+    USD, EUR, GBP, CAD, AUD, SGD, and more. View the full list in the Dashboard under **Settings → Payouts → Supported Currencies**.
+  </Card>
+  <Card title="Multi-currency settlements" icon="arrows-rotate">
+    Upgrade to a multi-currency account to hold balances in multiple currencies and reduce FX conversion fees by settling in the original transaction currency.
+  </Card>
+</CardGroup>

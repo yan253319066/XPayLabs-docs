@@ -1,0 +1,189 @@
+---
+title: "XPayLabs API Errors: Error Codes and How to Handle Them"
+sidebarTitle: "Errors"
+description: "XPayLabs returns structured error responses. Learn the error object format, HTTP status codes, error types, and best practices for handling failures."
+---
+
+XPayLabs uses conventional HTTP status codes to signal the outcome of every API request, and returns a consistent, machine-readable error object in the response body whenever something goes wrong. This means you can write generic error-handling code that inspects the `error.type` and `error.code` fields to decide how to respond — whether that means retrying the request, prompting the customer to use a different card, or surfacing a clear message in your UI.
+
+## Error Object Structure
+
+Every error response from the XPayLabs API has the same envelope. The top-level `error` key contains four fields that describe what went wrong and where.
+
+```json
+{
+  "error": {
+    "type": "card_error",
+    "code": "card_declined",
+    "message": "The card was declined. The customer should try a different payment method.",
+    "param": "payment_method_id"
+  }
+}
+```
+
+| Field | Description |
+|---|---|
+| `type` | The broad category of the error (see [Error Types](#error-types) below). Always present. |
+| `code` | A short machine-readable string identifying the specific error. Use this in your logic — not `message`. Always present. |
+| `message` | A human-readable description of the error intended for developers. Do not display this string verbatim to end users. Always present. |
+| `param` | The name of the request parameter that caused the error, if applicable. Useful for highlighting the offending field in a form. May be `null`. |
+
+## HTTP Status Codes
+
+XPayLabs maps errors to standard HTTP status codes. Check the status code first to determine the general nature of the failure before inspecting the error object.
+
+| Status Code | Meaning | Typical cause |
+|---|---|---|
+| `400 Bad Request` | The request was malformed or contained invalid data. | Missing required field, wrong data type, or invalid value. |
+| `401 Unauthorized` | Authentication failed. | Missing, expired, or malformed `Authorization` header or API key. |
+| `403 Forbidden` | The authenticated user does not have permission to perform this action. | Attempting to access another account's resources or using a restricted key. |
+| `404 Not Found` | The requested resource does not exist. | Invalid payment ID, nonexistent endpoint, or deleted resource. |
+| `422 Unprocessable Entity` | The request was well-formed but could not be processed due to business logic constraints. | Card declined, insufficient funds, or currency mismatch. |
+| `429 Too Many Requests` | You have exceeded the API rate limit. | Too many requests in a short window. See [Rate Limiting](#rate-limiting). |
+| `500 Internal Server Error` | An unexpected error occurred on XPayLabs servers. | Transient infrastructure issue. Retry with exponential backoff. |
+
+## Error Types
+
+The `error.type` field groups errors into one of five categories. Use the type to determine the appropriate handling strategy in your code.
+
+<CardGroup cols={1}>
+  <Card title="authentication_error" icon="key">
+    The API key is missing, invalid, revoked, or does not have permission to perform the requested action. Check that you are using the correct key for the environment (test vs. live) and that the key has not been rotated.
+  </Card>
+  <Card title="invalid_request_error" icon="triangle-exclamation">
+    The request was missing a required parameter, contained an invalid value, or referenced a resource that doesn't exist. Inspect the `param` field to identify which input needs to be corrected.
+  </Card>
+  <Card title="card_error" icon="credit-card">
+    The payment method was declined or is invalid. These errors are caused by the customer's bank or card network, not by your integration. Surface a customer-friendly message and ask the customer to try a different payment method.
+  </Card>
+  <Card title="rate_limit_error" icon="gauge-high">
+    Your integration is sending requests faster than the allowed rate. Slow down and retry the request after a short delay. See [Rate Limiting](#rate-limiting) for guidance.
+  </Card>
+  <Card title="api_error" icon="server">
+    An unexpected error occurred on XPayLabs' side. These are rare. Wait a moment and retry. If the error persists, check the [XPayLabs Status Page](https://status.xpaylabs.com) or contact support.
+  </Card>
+</CardGroup>
+
+## Common Card Error Codes
+
+When `error.type` is `card_error`, the `error.code` field will contain one of the following values. Display the suggested customer message (or a variant of it) in your payment UI — do not expose the raw `error.message` field, which contains developer-oriented detail.
+
+| Code | Suggested customer message |
+|---|---|
+| `card_declined` | "Your card was declined. Please try a different payment method." |
+| `insufficient_funds` | "Your card has insufficient funds. Please use a different card or payment method." |
+| `invalid_card_number` | "The card number you entered is invalid. Please check and try again." |
+| `expired_card` | "Your card has expired. Please use a card with a valid expiry date." |
+| `incorrect_cvc` | "The security code (CVC) you entered is incorrect. Please double-check the code on your card." |
+
+## Handling Errors in Your Integration
+
+The following example shows a structured error-handling pattern in Node.js. Check `error.type` to branch between recoverable errors (that the customer can resolve) and non-recoverable ones (that require developer attention).
+
+```javascript
+const XPayLabs = require('xpaylabs-node');
+const client = new XPayLabs('sk_test_abc123');
+
+async function createPayment(paymentMethodId, amountCents) {
+  try {
+    const payment = await client.payments.create({
+      amount: amountCents,
+      currency: 'usd',
+      payment_method_id: paymentMethodId,
+    });
+
+    console.log('Payment succeeded:', payment.id);
+    return payment;
+
+  } catch (err) {
+    if (!err.type) {
+      // Network error or unexpected exception — retry or surface a generic error
+      console.error('Unexpected error:', err.message);
+      throw err;
+    }
+
+    switch (err.type) {
+      case 'card_error':
+        // Customer-actionable: show the suggested message in your UI
+        return { error: true, userMessage: getCardErrorMessage(err.code) };
+
+      case 'invalid_request_error':
+        // Developer error: log for debugging, do not expose to customers
+        console.error(`Invalid request — param: ${err.param}, code: ${err.code}`);
+        throw err;
+
+      case 'authentication_error':
+        // Check your API key configuration
+        console.error('Authentication failed. Check your API key.');
+        throw err;
+
+      case 'rate_limit_error':
+        // Back off and retry (see retry logic below)
+        console.warn('Rate limited. Retrying after backoff...');
+        await sleep(2000);
+        return createPayment(paymentMethodId, amountCents);
+
+      case 'api_error':
+        // Transient XPayLabs error — retry with backoff
+        console.warn('XPayLabs server error. Will retry.');
+        await sleep(3000);
+        return createPayment(paymentMethodId, amountCents);
+
+      default:
+        throw err;
+    }
+  }
+}
+
+function getCardErrorMessage(code) {
+  const messages = {
+    card_declined: 'Your card was declined. Please try a different payment method.',
+    insufficient_funds: 'Your card has insufficient funds. Please use a different card.',
+    invalid_card_number: 'The card number you entered is invalid. Please check and try again.',
+    expired_card: 'Your card has expired. Please use a card with a valid expiry date.',
+    incorrect_cvc: 'The security code is incorrect. Please double-check the code on your card.',
+  };
+  return messages[code] || 'Your payment could not be processed. Please try again.';
+}
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+```
+
+## Rate Limiting
+
+XPayLabs enforces rate limits to maintain platform stability. If you exceed the limit, the API returns a `429 Too Many Requests` response with `error.type: "rate_limit_error"`.
+
+Check the following response headers to monitor your usage and time your retries correctly:
+
+| Header | Description |
+|---|---|
+| `X-RateLimit-Limit` | The maximum number of requests allowed in the current window. |
+| `X-RateLimit-Remaining` | The number of requests you can still make in the current window. |
+| `X-RateLimit-Reset` | Unix timestamp of when the current window resets and your allowance is restored. |
+
+When you receive a `429`, wait until `X-RateLimit-Reset` before retrying, or implement **exponential backoff** — starting with a short delay and doubling it on each subsequent failure — to avoid hammering the API as the window resets.
+
+```javascript
+async function retryWithBackoff(fn, maxAttempts = 5) {
+  let delay = 500; // Start with 500ms
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      const isRetryable = err.type === 'rate_limit_error' || err.type === 'api_error';
+      if (!isRetryable || attempt === maxAttempts) throw err;
+
+      console.warn(`Attempt ${attempt} failed. Retrying in ${delay}ms...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+      delay *= 2; // Exponential backoff
+    }
+  }
+}
+```
+
+<Tip>
+  When retrying a failed payment request due to a rate limit or transient server error, always include the same `Idempotency-Key` header you used in the original request. This ensures that if the original request actually succeeded despite returning an error (a rare but possible race condition), you will receive the existing payment instead of creating a duplicate charge.
+</Tip>

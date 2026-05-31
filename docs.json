@@ -1,0 +1,109 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "luma",
+  "name": "XPayLabs",
+  "colors": {
+    "primary": "#54545c"
+  },
+  "favicon": "https://icons.duckduckgo.com/ip3/starter.mintlify.com.ico",
+  "logo": {
+    "light": "https://media.brand.dev/99d23bb0-7527-48e5-b2c1-71011df3a4d8.svg",
+    "dark": "https://media.brand.dev/99d23bb0-7527-48e5-b2c1-71011df3a4d8.svg"
+  },
+  "navbar": {
+    "links": [
+      {
+        "label": "Support",
+        "href": "mailto:support@xpaylabs.com"
+      }
+    ],
+    "primary": {
+      "type": "button",
+      "label": "Dashboard",
+      "href": "https://dashboard.xpaylabs.com"
+    }
+  },
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "authentication"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/payments",
+              "concepts/settlements",
+              "concepts/webhooks",
+              "concepts/errors"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/accept-payments",
+              "guides/refunds",
+              "guides/payouts",
+              "guides/testing"
+            ]
+          },
+          {
+            "group": "Support",
+            "pages": [
+              "faq",
+              "troubleshooting"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "api-reference/overview",
+              "api-reference/authentication",
+              "api-reference/pagination"
+            ]
+          },
+          {
+            "group": "Payments",
+            "pages": [
+              "api-reference/payments/create",
+              "api-reference/payments/retrieve",
+              "api-reference/payments/list"
+            ]
+          },
+          {
+            "group": "Refunds",
+            "pages": [
+              "api-reference/refunds/create",
+              "api-reference/refunds/retrieve"
+            ]
+          },
+          {
+            "group": "Webhooks",
+            "pages": [
+              "api-reference/webhooks/overview",
+              "api-reference/webhooks/events"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "footer": {
+    "socials": {
+      "x": "https://x.com/xpaylabs",
+      "github": "https://github.com/xpaylabs"
+    }
+  }
+}

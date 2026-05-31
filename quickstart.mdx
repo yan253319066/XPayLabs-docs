@@ -1,0 +1,106 @@
+---
+title: "Get Started with XPayLabs in Under 10 Minutes"
+sidebarTitle: "Quickstart"
+description: "Learn how to create your first payment with XPayLabs using the REST API. Covers account setup, API keys, and your first transaction."
+---
+
+This quickstart walks you through everything you need to make your first payment request with XPayLabs — from creating an account to verifying a successful transaction. By the end, you'll have a working test payment and a clear understanding of how the XPayLabs REST API fits into your integration.
+
+## Prerequisites
+
+Before you begin, make sure you have the following ready:
+
+- An **XPayLabs account** (free to create at [dashboard.xpaylabs.com](https://dashboard.xpaylabs.com))
+- A **test API key** from your dashboard (starts with `sk_test_`)
+- An **HTTP client** — cURL, Postman, Insomnia, or any language of your choice
+
+---
+
+## Steps
+
+<Steps>
+  <Step title="Create your XPayLabs account">
+    Head to [dashboard.xpaylabs.com](https://dashboard.xpaylabs.com) and sign up for a free account. You'll receive a verification email — click the link to activate your account and access your dashboard.
+
+    Once inside, you'll land on the **Overview** page where you can monitor payments, payouts, and settlement activity.
+  </Step>
+
+  <Step title="Get your test API key">
+    Navigate to **Dashboard → Developers → API Keys** to find your credentials.
+
+    XPayLabs provides two types of keys:
+
+    - **Test key** — prefixed with `sk_test_`. Use this for all development and sandbox testing.
+    - **Live key** — prefixed with `sk_live_`. Use this only in production after you're ready to process real payments.
+
+    Copy your test key. You'll pass it as a Bearer token in every API request.
+
+    <Note>
+      Keep your API keys private. Never paste them directly into your codebase. Store them as environment variables instead — for example, `XPAYLABS_API_KEY=sk_test_...`.
+    </Note>
+  </Step>
+
+  <Step title="Create a test payment">
+    With your test key in hand, send a `POST` request to `/v1/payments`. The example below creates a $25.00 USD payment using a test card.
+
+    ```bash
+    curl --request POST \
+      --url https://api.xpaylabs.com/v1/payments \
+      --header "Authorization: Bearer sk_test_abc123xyz" \
+      --header "Content-Type: application/json" \
+      --data '{
+        "amount": 2500,
+        "currency": "usd",
+        "payment_method": "pm_card_visa_test"
+      }'
+    ```
+
+    A few things to note about the request body:
+
+    | Field | Type | Description |
+    |---|---|---|
+    | `amount` | integer | Amount in the **smallest currency unit** (e.g., cents for USD). `2500` = $25.00. |
+    | `currency` | string | ISO 4217 currency code in lowercase (e.g., `usd`, `eur`, `gbp`). |
+    | `payment_method` | string | The payment method token or test card identifier to charge. |
+  </Step>
+
+  <Step title="Verify the payment succeeded">
+    A successful response returns an HTTP `200 OK` with a JSON object describing the payment. Look for `"status": "succeeded"` to confirm the charge went through.
+
+    ```json
+    {
+      "id": "pay_01HX9KQZJ4T8V2MNBP6RWCDE5",
+      "object": "payment",
+      "amount": 2500,
+      "currency": "usd",
+      "status": "succeeded",
+      "payment_method": "pm_card_visa_test",
+      "created_at": "2024-06-01T14:32:10Z",
+      "livemode": false
+    }
+    ```
+
+    Save the `id` field — you'll use it to retrieve, refund, or look up this payment later via `GET /v1/payments/{id}`.
+  </Step>
+</Steps>
+
+---
+
+## What's next?
+
+<CardGroup cols={2}>
+  <Card title="Authentication" icon="key" href="/authentication">
+    Learn how API keys work, how to rotate them safely, and best practices for keeping them secure.
+  </Card>
+  <Card title="API Reference" icon="code" href="/api-reference">
+    Explore the full reference for payments, refunds, payouts, and webhooks.
+  </Card>
+</CardGroup>
+
+<Note>
+  **Test mode vs. live mode** — All requests made with a `sk_test_` key are sandboxed. No real money moves, and you can use [test card numbers](https://docs.xpaylabs.com/testing) to simulate various payment scenarios. Switch to your `sk_live_` key only when you're ready to go live.
+</Note>
+
+<Tip>
+  The [XPayLabs API Reference](https://docs.xpaylabs.com/api-reference) documents every endpoint, request parameter, and response field in detail — including `POST /v1/refunds` and `POST /v1/payouts` for after-payment workflows.
+</Tip>

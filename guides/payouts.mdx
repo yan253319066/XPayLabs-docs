@@ -1,0 +1,179 @@
+---
+title: "XPayLabs Payouts: Transfer Funds to Recipients Globally"
+sidebarTitle: "Payouts"
+description: "Use the XPayLabs Payouts API to transfer funds to verified vendors, marketplace sellers, and contractors with real-time status tracking."
+---
+
+Payouts let you transfer funds from your XPayLabs platform balance to third-party recipients — vendors, marketplace sellers, contractors, or any individual or business you need to pay. Payouts are distinct from **settlements**: settlements transfer your net earnings to your own bank account on a rolling schedule, while payouts are outbound transfers you initiate programmatically to any verified recipient at any time. This makes payouts ideal for marketplace disbursements, on-demand contractor payments, and B2B supplier transfers.
+
+## Prerequisites
+
+Before you can send a payout, each recipient must have a verified bank account or digital wallet registered in your XPayLabs Dashboard. Navigate to **Recipients** to add and verify recipient accounts. XPayLabs validates account details (via micro-deposits or instant verification) and sets the recipient's status to `verified` before any funds can be sent to them.
+
+Your XPayLabs **platform balance** must also be sufficient to cover the payout amount plus any applicable fees. You can view your current balance at any time in the XPayLabs Dashboard under **Balances**.
+
+<Tip>
+  Always include an **idempotency key** in your payout requests. If a network timeout or retry occurs, the same idempotency key guarantees that XPayLabs processes the payout only once — preventing accidental duplicate transfers to recipients.
+
+  ```bash
+  -H "Idempotency-Key: payout-vendor-42-2024-06-01"
+  ```
+</Tip>
+
+## Payout Steps
+
+<Steps>
+  <Step title="Add and verify a recipient">
+    Before sending a payout, register the person or business you want to pay in your XPayLabs Dashboard under **Recipients**. Provide their name, email, and bank account details. XPayLabs verifies the account and assigns it a unique recipient ID (e.g., `rec_xyz789`).
+
+    Store the recipient ID in your system — you'll reference it every time you pay this recipient.
+
+    <Info>
+      New recipients may be in a `pending_verification` state while XPayLabs validates the account. You cannot send a payout to a recipient until their status is `verified`. Listen for the `recipient.verified` webhook event to be notified automatically when verification completes.
+    </Info>
+  </Step>
+
+  <Step title="Confirm your available balance">
+    Payouts draw from your platform's XPayLabs balance. Your balance grows from the payments you process through XPayLabs (after fees are deducted) and from any top-ups you configure in the Dashboard.
+
+    Check your available balance in the **Balances** section of the Dashboard before issuing large payouts. Only funds in the `available` state can be used — `pending` funds are from payments still within the standard settlement window.
+  </Step>
+
+  <Step title="Create a payout">
+    Call `POST /v1/payouts` with the recipient ID, amount, currency, and an optional description. Include an idempotency key to guard against duplicate requests.
+
+    **cURL example:**
+
+    ```bash
+    curl -X POST https://api.xpaylabs.com/v1/payouts \
+      -H "Authorization: Bearer sk_test_abc123" \
+      -H "Content-Type: application/json" \
+      -H "Idempotency-Key: payout-vendor-42-2024-06-01" \
+      -d '{
+        "recipient_id": "rec_xyz789",
+        "amount": 25000,
+        "currency": "usd",
+        "description": "June invoice payment — PO #8821",
+        "metadata": {
+          "invoice_id": "inv_8821",
+          "vendor_id": "vendor_42"
+        }
+      }'
+    ```
+
+    **Node.js example:**
+
+    ```javascript
+    const axios = require("axios");
+
+    async function sendPayout({ recipientId, amount, currency, description, invoiceId }) {
+      const { data: payout } = await axios.post(
+        "https://api.xpaylabs.com/v1/payouts",
+        {
+          recipient_id: recipientId,
+          amount,        // in smallest currency unit, e.g. 25000 = $250.00
+          currency,
+          description,
+          metadata: { invoice_id: invoiceId },
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.XPAYLABS_SECRET_KEY}`,
+            "Content-Type": "application/json",
+            "Idempotency-Key": `payout-${invoiceId}`,
+          },
+        }
+      );
+
+      console.log(`Payout created: ${payout.id} — status: ${payout.status}`);
+      return payout;
+    }
+
+    sendPayout({
+      recipientId: "rec_xyz789",
+      amount: 25000,
+      currency: "usd",
+      description: "June invoice payment — PO #8821",
+      invoiceId: "inv_8821",
+    });
+    ```
+
+    | Field | Type | Required | Description |
+    |---|---|---|---|
+    | `recipient_id` | string | Yes | ID of the verified recipient |
+    | `amount` | integer | Yes | Amount in smallest currency unit |
+    | `currency` | string | Yes | ISO 4217 currency code |
+    | `description` | string | No | Memo shown on the recipient's bank statement |
+    | `metadata` | object | No | Key-value pairs for your records |
+  </Step>
+
+  <Step title="Track payout status">
+    A payout moves through the following lifecycle states. Poll `GET /v1/payouts/{id}` or listen to webhook events to track progress.
+
+    | Status | Meaning |
+    |---|---|
+    | `pending` | Payout created; waiting to be submitted to the banking network |
+    | `in_transit` | Submitted to the banking network; funds are on their way |
+    | `paid` | Funds have arrived in the recipient's account |
+    | `failed` | Payout could not be completed; see `failure_code` |
+
+    ```bash
+    curl https://api.xpaylabs.com/v1/payouts/po_abc987 \
+      -H "Authorization: Bearer sk_test_abc123"
+    ```
+
+    ```json
+    {
+      "id": "po_abc987",
+      "object": "payout",
+      "recipient_id": "rec_xyz789",
+      "amount": 25000,
+      "currency": "usd",
+      "status": "in_transit",
+      "description": "June invoice payment — PO #8821",
+      "estimated_arrival": "2024-06-03T00:00:00Z",
+      "created_at": "2024-06-01T10:30:00Z"
+    }
+    ```
+  </Step>
+
+  <Step title="Handle failures">
+    When a payout fails, the payout object includes a `failure_code` and `failure_message`. Inspect these to determine the appropriate remediation.
+
+    ```json
+    {
+      "id": "po_abc987",
+      "status": "failed",
+      "failure_code": "invalid_account",
+      "failure_message": "The bank account number provided is invalid or does not exist."
+    }
+    ```
+
+    | Failure Code | Cause | Recommended Action |
+    |---|---|---|
+    | `insufficient_funds` | Your platform balance is too low | Top up your XPayLabs balance and retry |
+    | `invalid_account` | Recipient account number or routing number is incorrect | Ask the recipient to update their bank details |
+    | `account_closed` | Recipient's bank account has been closed | Collect new account details and register a new recipient |
+    | `recipient_not_verified` | Recipient has not completed verification | Wait for `recipient.verified` webhook before retrying |
+    | `payout_limit_exceeded` | Amount exceeds per-payout or daily limit | Split into smaller payouts or contact support to raise limits |
+
+    Listen for the `payout.failed` webhook to trigger automated alerts or retry logic in your system.
+  </Step>
+</Steps>
+
+## Payout Timing
+
+Payout speed depends on the delivery option you select when creating the payout. Supported countries and available speeds vary based on the recipient's location and local banking infrastructure.
+
+| Speed | Arrival | Fee | Availability |
+|---|---|---|---|
+| **Standard** | T+2 business days | Included in platform fee | US, EU, UK, CA, AU, and more |
+| **Express** | Same business day (if submitted before 3 PM local) | Additional fee applies | US, UK, select EU countries |
+
+<Info>
+  Payout availability and currency support depend on the recipient's country. XPayLabs supports payouts to 50+ countries. Check the [supported countries](https://docs.xpaylabs.com/payouts/countries) page for a full list of supported destinations and currencies.
+</Info>
+
+## Supported Currencies
+
+XPayLabs supports payout currencies including `usd`, `eur`, `gbp`, `cad`, `aud`, `sgd`, `jpy`, and many others. The payout currency must be supported in the recipient's country. If your platform balance is in a different currency, XPayLabs applies a foreign exchange conversion at the current rate plus a small conversion fee.

@@ -1,0 +1,191 @@
+---
+title: "How to Issue Full or Partial Refunds with XPayLabs"
+sidebarTitle: "Refunds"
+description: "Learn how to issue full and partial refunds against captured payments using the XPayLabs Refunds API, with status tracking and webhook guidance."
+---
+
+Refunds let you return funds to a customer for a payment that has already been captured. You can issue a full refund for the entire original amount or a partial refund for any portion of it. XPayLabs initiates the refund immediately upon a successful API call, and funds typically appear back in the customer's account within 5–10 business days, depending on their bank and card network.
+
+<Warning>
+  Refunds cannot be reversed once submitted. Before calling `POST /v1/refunds`, confirm the payment ID, amount, and reason with your internal records.
+</Warning>
+
+## Refund Steps
+
+<Steps>
+  <Step title="Find the payment ID you want to refund">
+    Every refund is tied to a specific payment. Retrieve the payment ID from your own database records, or query the payments list endpoint to look it up:
+
+    ```bash
+    curl "https://api.xpaylabs.com/v1/payments?limit=20&status=succeeded" \
+      -H "Authorization: Bearer sk_test_abc123"
+    ```
+
+    The response returns an array of payment objects. Locate the payment you want to refund and copy its `id` field (e.g., `pay_abc123xyz`).
+  </Step>
+
+  <Step title="Create a refund">
+    Call `POST /v1/refunds` with the `payment_id`. Include an `amount` field (in cents) for a partial refund, or omit it to refund the full captured amount.
+
+    **Full refund:**
+
+    ```bash
+    curl -X POST https://api.xpaylabs.com/v1/refunds \
+      -H "Authorization: Bearer sk_test_abc123" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "payment_id": "pay_abc123xyz",
+        "reason": "customer_request"
+      }'
+    ```
+
+    **Partial refund ($12.50 on a $49.99 payment):**
+
+    ```bash
+    curl -X POST https://api.xpaylabs.com/v1/refunds \
+      -H "Authorization: Bearer sk_test_abc123" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "payment_id": "pay_abc123xyz",
+        "amount": 1250,
+        "reason": "partial_return"
+      }'
+    ```
+
+    **Accepted `reason` values:** `customer_request`, `duplicate`, `fraudulent`, `partial_return`, `other`.
+
+    | Field | Type | Required | Description |
+    |---|---|---|---|
+    | `payment_id` | string | Yes | ID of the payment to refund |
+    | `amount` | integer | No | Amount in cents; omit for full refund |
+    | `reason` | string | No | Reason code for the refund |
+    | `metadata` | object | No | Key-value pairs for internal tracking |
+  </Step>
+
+  <Step title="Check refund status">
+    The `POST /v1/refunds` response includes a refund object with a `status` field:
+
+    **Successful refund response:**
+
+    ```json
+    {
+      "id": "ref_def456",
+      "object": "refund",
+      "payment_id": "pay_abc123xyz",
+      "amount": 4999,
+      "currency": "usd",
+      "status": "succeeded",
+      "reason": "customer_request",
+      "created_at": "2024-06-10T09:15:00Z"
+    }
+    ```
+
+    **Partial refund response:**
+
+    ```json
+    {
+      "id": "ref_ghi789",
+      "object": "refund",
+      "payment_id": "pay_abc123xyz",
+      "amount": 1250,
+      "currency": "usd",
+      "status": "succeeded",
+      "reason": "partial_return",
+      "created_at": "2024-06-10T09:20:00Z"
+    }
+    ```
+
+    | Status | Meaning |
+    |---|---|
+    | `succeeded` | Refund processed; funds are on their way to the customer |
+    | `pending` | Refund is being processed; check again shortly |
+    | `failed` | Refund could not be processed; check `failure_code` for details |
+
+    To retrieve a refund at any time, call:
+
+    ```bash
+    curl https://api.xpaylabs.com/v1/refunds/ref_def456 \
+      -H "Authorization: Bearer sk_test_abc123"
+    ```
+  </Step>
+
+  <Step title="Listen for the refund.succeeded webhook">
+    Register a `refund.succeeded` webhook in your XPayLabs Dashboard to receive a server-side notification when the refund completes. This is more reliable than polling, especially for refunds that enter a `pending` state.
+
+    ```javascript
+    app.post("/webhooks/xpaylabs", express.raw({ type: "application/json" }), (req, res) => {
+      const signature = req.headers["x-xpaylabs-signature"];
+      let event;
+
+      try {
+        event = xpay.webhooks.constructEvent(
+          req.body,
+          signature,
+          process.env.XPAYLABS_WEBHOOK_SECRET
+        );
+      } catch (err) {
+        return res.status(400).send(`Signature verification failed: ${err.message}`);
+      }
+
+      if (event.type === "refund.succeeded") {
+        const refund = event.data.object;
+        console.log(`Refund ${refund.id} succeeded for payment ${refund.payment_id}`);
+        // Update your order/return record in the database
+      }
+
+      if (event.type === "refund.failed") {
+        const refund = event.data.object;
+        console.error(`Refund ${refund.id} failed: ${refund.failure_code}`);
+        // Alert your support team or retry logic
+      }
+
+      res.json({ received: true });
+    });
+    ```
+  </Step>
+</Steps>
+
+## Partial Refunds
+
+You can issue multiple partial refunds against the same payment as long as the total refunded amount does not exceed the original captured amount. Track each refund's `id` and `amount` in your system to avoid over-refunding.
+
+```javascript
+// Example: issue two partial refunds on a $49.99 payment (4999 cents)
+const refunds = [
+  { payment_id: "pay_abc123xyz", amount: 1000, reason: "partial_return" },  // $10.00
+  { payment_id: "pay_abc123xyz", amount: 2500, reason: "partial_return" },  // $25.00
+  // Total so far: $35.00 — $14.99 remaining refundable
+];
+
+for (const body of refunds) {
+  const { data } = await axios.post("https://api.xpaylabs.com/v1/refunds", body, {
+    headers: { Authorization: `Bearer ${process.env.XPAYLABS_SECRET_KEY}` },
+  });
+  console.log(`Refund ${data.id}: ${data.status}`);
+}
+```
+
+<Note>
+  The `amount` field is always in the smallest currency unit. For USD, $12.50 is represented as `1250`. For JPY (a zero-decimal currency), ¥500 is represented as `500`.
+</Note>
+
+## Refund Timing
+
+Funds typically return to the customer's original payment method according to the following timelines:
+
+| Payment Method | Estimated Refund Time |
+|---|---|
+| Visa / Mastercard | 5–10 business days |
+| American Express | 5–7 business days |
+| Apple Pay / Google Pay | 3–5 business days |
+| SEPA Direct Debit | 5–10 business days |
+| Bank transfer | 3–5 business days |
+
+These timelines are estimates. The actual posting date depends on the customer's issuing bank.
+
+## Limitations
+
+- You cannot refund more than the original captured amount for a given payment.
+- You cannot issue a refund more than **180 days** after the original payment was captured.
+- Refunds apply only to payments with a `status` of `succeeded`. Payments in `pending` or `failed` state cannot be refunded.
+- Once a refund is submitted, it cannot be cancelled or reversed.

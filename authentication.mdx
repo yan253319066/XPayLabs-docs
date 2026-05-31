@@ -1,0 +1,155 @@
+---
+title: "Authenticate with XPayLabs API Using API Keys"
+sidebarTitle: "Authentication"
+description: "XPayLabs uses API keys to authenticate all requests. Learn how to obtain your keys, pass them in request headers, and rotate them securely."
+---
+
+XPayLabs authenticates every API request using a secret API key passed as a Bearer token in the `Authorization` header. There are two types of keys: **test keys** (prefixed `sk_test_...`) for development and sandbox use, and **live keys** (prefixed `sk_live_...`) for production traffic. Every key you generate is scoped to your account — XPayLabs uses it to identify who is making the request and whether they have permission to perform the action.
+
+---
+
+## Getting your API keys
+
+You manage all API keys from the XPayLabs Dashboard. To find them:
+
+1. Log in to [dashboard.xpaylabs.com](https://dashboard.xpaylabs.com).
+2. Navigate to **Developers → API Keys**.
+3. Copy the key that matches your current environment.
+
+Your keys page displays two keys side-by-side:
+
+| Key type | Prefix | Purpose |
+|---|---|---|
+| **Test secret key** | `sk_test_` | Development, CI pipelines, sandbox testing |
+| **Live secret key** | `sk_live_` | Production — charges real payment methods |
+
+<Warning>
+  Never expose your secret keys (`sk_test_` or `sk_live_`) in client-side code, public repositories, or browser-accessible environments. Anyone who obtains your live key can initiate real charges on your account. If you suspect a key has been compromised, rotate it immediately — see [Key Rotation](#key-rotation) below.
+</Warning>
+
+---
+
+## Making authenticated requests
+
+Pass your API key in the `Authorization` header of every request using the `Bearer` scheme. XPayLabs does not support query-string or cookie-based authentication.
+
+### cURL
+
+```bash
+curl --request POST \
+  --url https://api.xpaylabs.com/v1/payments \
+  --header "Authorization: Bearer sk_test_abc123xyz" \
+  --header "Content-Type: application/json" \
+  --data '{
+    "amount": 5000,
+    "currency": "usd",
+    "payment_method": "pm_card_visa_test"
+  }'
+```
+
+### Node.js (fetch)
+
+```javascript
+const response = await fetch("https://api.xpaylabs.com/v1/payments", {
+  method: "POST",
+  headers: {
+    "Authorization": `Bearer ${process.env.XPAYLABS_API_KEY}`,
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    amount: 5000,
+    currency: "usd",
+    payment_method: "pm_card_visa_test",
+  }),
+});
+
+const payment = await response.json();
+console.log(payment.status); // "succeeded"
+```
+
+<Note>
+  Notice that both examples read the key from an environment variable (`XPAYLABS_API_KEY`) rather than hardcoding it. This is the recommended pattern for all environments. See [Keeping keys secure](#keeping-keys-secure) for more detail.
+</Note>
+
+---
+
+## Test vs. live keys
+
+The key type you use determines how XPayLabs processes the request. The table below summarizes the key differences.
+
+| Behavior | Test key (`sk_test_`) | Live key (`sk_live_`) |
+|---|---|---|
+| Real money moved | ❌ No | ✅ Yes |
+| Test card numbers work | ✅ Yes | ❌ No |
+| Webhooks fired | ✅ Yes (sandbox events) | ✅ Yes (real events) |
+| Settlements triggered | ❌ No | ✅ Yes |
+| Appears on billing | ❌ No | ✅ Yes |
+| `livemode` field in response | `false` | `true` |
+
+Always develop and test against your `sk_test_` key. XPayLabs clearly marks every sandbox object with `"livemode": false` so you can distinguish test data from production data at a glance.
+
+<Info>
+  Test mode supports a full set of test card numbers to simulate different payment outcomes — successful charges, declines, insufficient funds, and more. See the [Testing guide](https://docs.xpaylabs.com/testing) for the complete list.
+</Info>
+
+---
+
+## Keeping keys secure
+
+Treat your API keys like passwords. Follow these practices to reduce your exposure:
+
+- **Use environment variables.** Store keys in `.env` files locally and in your hosting platform's secret manager in production. Never hardcode them in source files.
+- **Never commit keys to source control.** Add `.env` to your `.gitignore` immediately. Use a secrets-scanning tool (such as GitGuardian or GitHub secret scanning) to catch accidental leaks.
+- **Restrict access.** Only give team members access to the Dashboard keys page on a need-to-know basis. Use separate XPayLabs accounts or projects for separate products.
+- **Use test keys in non-production environments.** CI pipelines, staging, and local development should always use `sk_test_` keys — never `sk_live_`.
+- **Rotate proactively.** If there's any chance a key was exposed, rotate it immediately. Rotation is fast and designed to be zero-downtime (see below).
+
+---
+
+## Key rotation
+
+Rotate a key whenever you suspect it has been compromised, when a team member with key access leaves, or as part of a regular security review. XPayLabs supports zero-downtime rotation so you can swap keys without dropping live traffic.
+
+### How to rotate a key
+
+<Steps>
+  <Step title="Generate a new key">
+    In the Dashboard, go to **Developers → API Keys** and click **Roll key** next to the key you want to rotate. XPayLabs generates a new key immediately. Your old key remains active at this point.
+  </Step>
+
+  <Step title="Deploy the new key to your services">
+    Update the environment variable (e.g., `XPAYLABS_API_KEY`) in every service that uses the key. Deploy or restart each service so it picks up the new value. Verify that requests are succeeding with the new key before proceeding.
+  </Step>
+
+  <Step title="Revoke the old key">
+    Once all your services are using the new key and you've confirmed normal operation, return to **Developers → API Keys** and click **Revoke** on the old key. Revoking is irreversible — any service still using the old key will immediately start receiving `401 Unauthorized` errors.
+  </Step>
+</Steps>
+
+<Tip>
+  During the window between generating the new key and revoking the old one, both keys are valid. This overlap window is intentional and lets you roll deployments gradually without downtime.
+</Tip>
+
+---
+
+## Authentication errors
+
+If your request is rejected for an authentication or authorization reason, XPayLabs returns one of the following HTTP error responses.
+
+| HTTP status | Error code | Cause | Resolution |
+|---|---|---|---|
+| `401 Unauthorized` | `invalid_api_key` | The `Authorization` header is missing, malformed, or the key does not exist. | Verify the header format is `Authorization: Bearer sk_test_abc123xyz` and that the key is copied correctly. |
+| `401 Unauthorized` | `expired_api_key` | The key has been revoked or expired. | Generate a new key in the Dashboard and update your environment. |
+| `403 Forbidden` | `insufficient_permissions` | The key is valid but does not have permission to perform this action (e.g., using a test key against a live endpoint, or restricted scope). | Confirm you are using the correct key type for the environment and that your account has access to the requested resource. |
+
+A `401` error response body looks like this:
+
+```json
+{
+  "error": {
+    "code": "invalid_api_key",
+    "message": "No valid API key provided. Pass your key in the Authorization header as 'Bearer sk_test_...' or 'Bearer sk_live_...'.",
+    "status": 401
+  }
+}
+```
