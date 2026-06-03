@@ -1,4 +1,4 @@
-# 定价 — XPayLabs
+# 定价 — XPayLabs（xpay）
 
 ## 自托管（开源）
 - 价格：$0/月

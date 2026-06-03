@@ -1,4 +1,4 @@
-# Pricing — XPayLabs
+# Pricing — XPayLabs (xpay)
 
 ## Self-Hosted (Open Source)
 - Price: $0/month
