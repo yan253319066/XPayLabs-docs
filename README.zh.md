@@ -28,6 +28,7 @@ API 服务器启动在 `3010` 端口。完整部署说明请参阅[快速入门�
 | **零网关手续费** | 仅需支付链上 Gas 费用 — 无 0.5-2% 中间商费用 |
 | **HMAC-SHA256 认证** | 使用商户令牌签名请求，而非 Bearer 令牌 |
 | **Webhook 回调** | 队列驱动的 HMAC 签名事件，支持指数退避重试 |
+| **x402 协议** | 面向 AI 代理和 LLM API 的按调用 USDC 微支付——买家 SDK（`@xpaylabs/x402`）+ 卖家中间件（`@x402/express`） |
 
 ## 架构
 
@@ -69,7 +70,7 @@ XPayLabs 以一组通过 Docker Compose 编排的微服务运行：
 ```
 api-reference/          — 完整 REST API 文档（createCollection、createPayout、状态查询、webhook）
 concepts/               — 支付、结算、webhook、错误处理
-guides/                 — 接收付款、付款、Node.js SDK、Spring Boot SDK、AI 代理、测试
+guides/                 — 接收付款、付款、Node.js SDK、Spring Boot SDK、AI 代理、测试、x402 协议
 ```
 
 ## 本地开发
