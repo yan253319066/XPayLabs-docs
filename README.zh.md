@@ -130,4 +130,5 @@ mint dev
 - [GitHub 仓库](https://github.com/xpaylabs/gateway)
 - [API 参考](/api-reference/overview)
 - [快速入门指南](/quickstart)
+- [x402 协议 — AI 代理 USDC 微支付](/guides/x402-overview)
 - [定价方案](https://www.xpaylabs.com/zh/pricing)

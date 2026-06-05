@@ -1,0 +1,127 @@
+---
+title: "x402 Protocol — USDC Micropayments for AI Agents & LLM APIs"
+sidebarTitle: "x402 Protocol Overview"
+description: "Pay-per-call USDC micropayments via the x402 protocol. One-line buyer SDK for AI agents, Express middleware for API sellers — no API key management required."
+---
+
+The x402 protocol enables **pay-per-call USDC micropayments** for AI agents, LLM APIs, and any HTTP service. Buyers pay in USDC per request; sellers validate payments server-side with zero configuration overhead.
+
+## How It Works
+
+1. **Buyer** calls `pay(url, amount)` with the seller's URL and the expected USDC amount
+2. The SDK negotiates a payment session with the x402 facilitator, submits an ERC-20 Transfer transaction on-chain, and attaches the authorization header to the request
+3. **Seller** middleware (`@x402/express`) validates the header, extracts the payment details, and allows the request through
+4. Both sides receive the on-chain transaction hash as proof of payment
+
+## Buyer SDK (`@xpaylabs/x402`)
+
+Install:
+
+```bash
+npm install @xpaylabs/x402
+```
+
+### One-shot Payment
+
+```typescript
+import { pay } from '@xpaylabs/x402';
+
+const response = await pay('https://api.example.com/weather', {
+  amount: '0.001',       // USDC amount
+  network: 'base-sepolia',
+  privateKey: '0x...',   // buyer's EVM private key
+});
+
+console.log(response.data);     // response body
+console.log(response.paymentId); // on-chain tx hash
+```
+
+### Session-based Client
+
+```typescript
+import { XPayClient } from '@xpaylabs/x402';
+
+const client = new XPayClient({
+  privateKey: '0x...',
+  network: 'base-sepolia',
+  facilitatorUrl: 'https://x402-facilitator-testnet.vercel.app/api',
+});
+
+const res1 = await client.request('https://api.example.com/weather', {
+  amount: '0.001',
+});
+const res2 = await client.request('https://api.example.com/weather', {
+  amount: '0.001',
+});
+```
+
+Each call pays independently. The client tracks the last `PAYMENT-RESPONSE` header for audit.
+
+### Payment ID Extraction
+
+```typescript
+import { extractPaymentId } from '@xpaylabs/x402';
+
+const paymentId = extractPaymentId(response.headers);
+console.log(paymentId); // "0xabc...123"
+```
+
+## Seller Middleware (`@x402/express`)
+
+```bash
+npm install @x402/express
+```
+
+```typescript
+import express from 'express';
+import { x402Middleware } from '@x402/express';
+
+const app = express();
+
+app.use(x402Middleware({
+  network: 'base-sepolia',
+  facilitatorUrl: 'https://x402-facilitator-testnet.vercel.app/api',
+  evmAddress: '0x...',       // seller's USDC receiving address
+}));
+
+// Paid route — client must include valid x402 payment
+app.get('/api/generate', (req, res) => {
+  // req.x402 contains decoded payment info
+  res.json({ result: 'llm response', paymentId: req.x402.paymentId });
+});
+
+// Public route — no payment required
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok' });
+});
+```
+
+## AI Agent Payment Flow
+
+x402 is designed for autonomous agent-to-API payments:
+
+```
+AI Agent (buyer)                    AI API (seller)
+      │                                   │
+      │  1. POST /api/generate            │
+      │     (no payment yet)              │
+      │                                   │
+      │  2. 402 Payment Required          │
+      │     { amount: "0.001" }           │
+      │                                   │
+      │  3. Submit USDC Transfer (on-chain)│
+      │     via x402 facilitator          │
+      │                                   │
+      │  4. retry with x402 auth header   │
+      │                                   │
+      │  5. 200 OK + response             │
+      │     (paymentId in headers)        │
+```
+
+No API keys, no subscriptions, no billing dashboard — just pay-per-call with USDC.
+
+## Related Resources
+
+- [Buyer SDK Repository](https://github.com/yan253319066/XPayLabs-x402)
+- [Seller Test Server](https://github.com/yan253319066/XPayLabs-x402-seller)
+- [x402 Protocol Spec](/guides/x402-workflow)

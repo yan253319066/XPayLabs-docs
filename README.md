@@ -28,6 +28,7 @@ The API server starts on port `3010`. Full deployment instructions are in the [q
 | **Zero gateway fees** | Pay only on-chain gas costs — no 0.5-2% middleman fees |
 | **HMAC-SHA256 auth** | Request signing using merchant token, not Bearer tokens |
 | **Webhook callbacks** | Queue-backed, HMAC-signed events with exponential backoff retry |
+| **x402 Protocol** | Pay-per-call USDC micropayments for AI agents and LLM APIs — buyer SDK (`@xpaylabs/x402`) + seller middleware (`@x402/express`) |
 
 ## Architecture
 
@@ -69,7 +70,7 @@ Rate limits vary by endpoint — `order/createCollection` and `order/createPayou
 ```
 api-reference/          — Full REST API docs (createCollection, createPayout, status, webhooks)
 concepts/               — Payments, settlements, webhooks, errors
-guides/                 — Accept payments, payouts, Node.js SDK, Spring Boot SDK, AI agents, testing
+guides/                 — Accept payments, payouts, Node.js SDK, Spring Boot SDK, AI agents, testing, x402 protocol
 ```
 
 ## Development
@@ -130,4 +131,5 @@ Testnet variants (`TRON_TEST`, `ETH_SEPOLIA`, `BSC_TEST`, `POLYGON_AMOY`, `AVAX_
 - [GitHub](https://github.com/xpaylabs/gateway)
 - [API Reference](/api-reference/overview)
 - [Quickstart Guide](/quickstart)
+- [x402 Protocol — AI Agent USDC Micropayments](/guides/x402-overview)
 - [Pricing](https://www.xpaylabs.com/pricing)

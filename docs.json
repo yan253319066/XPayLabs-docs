@@ -65,6 +65,12 @@
                 ]
               },
               {
+                "group": "x402 Protocol",
+                "pages": [
+                  "guides/x402-overview"
+                ]
+              },
+              {
                 "group": "Support",
                 "pages": [
                   "faq",
@@ -143,6 +149,12 @@
                   "zh/guides/nodejs-integration",
                   "zh/guides/ai-agents",
                   "zh/guides/testing"
+                ]
+              },
+              {
+                "group": "x402 协议",
+                "pages": [
+                  "zh/guides/x402-overview"
                 ]
               },
               {

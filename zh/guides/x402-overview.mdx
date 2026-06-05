@@ -1,0 +1,119 @@
+---
+title: "x402 协议 — AI 代理与 LLM API 的 USDC 微支付"
+sidebarTitle: "x402 协议概述"
+description: "通过 x402 协议实现按次付费的 USDC 微支付。一行代码集成买家 SDK，服务器端 Express 中间件验证支付，无需管理 API 密钥。"
+---
+
+x402 协议让 AI 代理、LLM API 和任何 HTTP 服务实现 **按次付费的 USDC 微支付**。买家按请求支付 USDC，卖家在服务端零配置验证支付。
+
+## 工作原理
+
+1. **买家** 调用 `pay(url, amount)` 传入卖家 URL 和预期的 USDC 金额
+2. SDK 与 x402 facilitator 协商支付会话，在链上提交 ERC-20 Transfer 交易，并将授权头附加到请求中
+3. **卖家** 中间件（`@x402/express`）验证授权头，提取支付详情，允许请求通过
+4. 双方获得链上交易哈希作为支付凭证
+
+## 买家 SDK（`@xpaylabs/x402`）
+
+```bash
+npm install @xpaylabs/x402
+```
+
+### 单次支付
+
+```typescript
+import { pay } from '@xpaylabs/x402';
+
+const response = await pay('https://api.example.com/weather', {
+  amount: '0.001',
+  network: 'base-sepolia',
+  privateKey: '0x...',
+});
+
+console.log(response.data);      // 响应体
+console.log(response.paymentId); // 链上交易哈希
+```
+
+### 会话客户端
+
+```typescript
+import { XPayClient } from '@xpaylabs/x402';
+
+const client = new XPayClient({
+  privateKey: '0x...',
+  network: 'base-sepolia',
+  facilitatorUrl: 'https://x402-facilitator-testnet.vercel.app/api',
+});
+
+const res1 = await client.request('https://api.example.com/weather', {
+  amount: '0.001',
+});
+const res2 = await client.request('https://api.example.com/weather', {
+  amount: '0.001',
+});
+```
+
+### 提取支付 ID
+
+```typescript
+import { extractPaymentId } from '@xpaylabs/x402';
+
+const paymentId = extractPaymentId(response.headers);
+console.log(paymentId); // "0xabc...123"
+```
+
+## 卖家中间件（`@x402/express`）
+
+```bash
+npm install @x402/express
+```
+
+```typescript
+import express from 'express';
+import { x402Middleware } from '@x402/express';
+
+const app = express();
+
+app.use(x402Middleware({
+  network: 'base-sepolia',
+  facilitatorUrl: 'https://x402-facilitator-testnet.vercel.app/api',
+  evmAddress: '0x...',       // 卖家 USDC 收款地址
+}));
+
+// 付费路由
+app.get('/api/generate', (req, res) => {
+  res.json({ result: 'llm response', paymentId: req.x402.paymentId });
+});
+
+// 公共路由
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok' });
+});
+```
+
+## AI 代理支付流程
+
+```
+AI 代理 (买家)                      AI API (卖家)
+      │                                   │
+      │  1. POST /api/generate            │
+      │     (未支付)                      │
+      │                                   │
+      │  2. 402 Payment Required          │
+      │     { amount: "0.001" }           │
+      │                                   │
+      │  3. 提交 USDC Transfer (链上)      │
+      │     通过 x402 facilitator         │
+      │                                   │
+      │  4. 重试 + x402 授权头            │
+      │                                   │
+      │  5. 200 OK + 响应                 │
+      │     (paymentId 在 headers 中)     │
+```
+
+无需 API 密钥、无需订阅、无需账单面板——按次付费，即付即用。
+
+## 相关资源
+
+- [买家 SDK 仓库](https://github.com/yan253319066/XPayLabs-x402)
+- [卖家测试服务器](https://github.com/yan253319066/XPayLabs-x402-seller)
