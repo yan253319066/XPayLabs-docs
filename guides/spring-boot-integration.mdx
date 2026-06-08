@@ -12,7 +12,7 @@ Add the Maven dependency to your `pom.xml`:
 
 ```xml
 <dependency>
-  <groupId>io.xpay</groupId>
+  <groupId>com.xpaylabs</groupId>
   <artifactId>xpay-java-sdk</artifactId>
   <version>0.1.0</version>
 </dependency>
@@ -21,7 +21,7 @@ Add the Maven dependency to your `pom.xml`:
 For Gradle:
 
 ```groovy
-implementation 'io.xpay:xpay-java-sdk:0.1.0'
+implementation 'com.xpaylabs:xpay-java-sdk:0.1.0'
 ```
 
 ## Configuration
@@ -29,8 +29,8 @@ implementation 'io.xpay:xpay-java-sdk:0.1.0'
 Configure the SDK with your merchant token and API secret:
 
 ```java
-import io.xpay.sdk.XPay;
-import io.xpay.sdk.XPayConfig;
+import com.xpaylabs.sdk.XPay;
+import com.xpaylabs.sdk.XPayConfig;
 
 @Configuration
 public class XPayConfigBean {
@@ -63,9 +63,9 @@ public class XPayConfigBean {
 ### Create a Collection Order
 
 ```java
-import io.xpay.sdk.model.request.CollectionRequest;
-import io.xpay.sdk.model.response.ApiResponse;
-import io.xpay.sdk.model.response.CollectionData;
+import com.xpaylabs.sdk.model.request.CollectionRequest;
+import com.xpaylabs.sdk.model.response.ApiResponse;
+import com.xpaylabs.sdk.model.response.CollectionData;
 
 @RestController
 public class PaymentController {
@@ -100,8 +100,8 @@ public class PaymentController {
 ### Create a Payout
 
 ```java
-import io.xpay.sdk.model.request.PayoutRequest;
-import io.xpay.sdk.model.response.PayoutData;
+import com.xpaylabs.sdk.model.request.PayoutRequest;
+import com.xpaylabs.sdk.model.response.PayoutData;
 
 public PayoutData sendPayout(String uid, String amount, String receiveAddress) throws Exception {
   PayoutRequest request = PayoutRequest.builder()
@@ -121,7 +121,7 @@ public PayoutData sendPayout(String uid, String amount, String receiveAddress) t
 ### Query Order Status
 
 ```java
-import io.xpay.sdk.model.response.OrderDetails;
+import com.xpaylabs.sdk.model.response.OrderDetails;
 
 public OrderDetails getStatus(String orderId) throws Exception {
   ApiResponse<OrderDetails> response = xpay.getOrderStatus(orderId);
@@ -134,7 +134,7 @@ public OrderDetails getStatus(String orderId) throws Exception {
 ### Get Supported Symbols
 
 ```java
-import io.xpay.sdk.model.response.SupportedSymbol;
+import com.xpaylabs.sdk.model.response.SupportedSymbol;
 
 public List<SupportedSymbol> getSymbols() throws Exception {
   ApiResponse<List<SupportedSymbol>> response = xpay.getSupportedSymbols();
@@ -151,8 +151,8 @@ public List<SupportedSymbol> getSymbols(String chain, String symbol) throws Exce
 ### Get Merchant Balance
 
 ```java
-import io.xpay.sdk.model.request.MerchantBalanceRequest;
-import io.xpay.sdk.model.response.MerchantBalanceData;
+import com.xpaylabs.sdk.model.request.MerchantBalanceRequest;
+import com.xpaylabs.sdk.model.response.MerchantBalanceData;
 
 public MerchantBalanceData getBalance(String symbol) throws Exception {
   MerchantBalanceRequest request = MerchantBalanceRequest.builder()
@@ -168,8 +168,8 @@ public MerchantBalanceData getBalance(String symbol) throws Exception {
 ### Get Deposit Address for a User
 
 ```java
-import io.xpay.sdk.model.request.CryptoAddressRequest;
-import io.xpay.sdk.model.response.CryptoAddressData;
+import com.xpaylabs.sdk.model.request.CryptoAddressRequest;
+import com.xpaylabs.sdk.model.response.CryptoAddressData;
 
 public CryptoAddressData getDepositAddress(String uid, String chain, String symbol) throws Exception {
   CryptoAddressRequest request = CryptoAddressRequest.builder()
@@ -189,9 +189,9 @@ public CryptoAddressData getDepositAddress(String uid, String chain, String symb
 The SDK provides built-in webhook signature verification and event parsing. Set up a controller to receive webhook callbacks:
 
 ```java
-import io.xpay.sdk.model.webhook.WebhookEvent;
-import io.xpay.sdk.model.webhook.OrderWebhookData;
-import io.xpay.sdk.model.webhook.CollectWebhookData;
+import com.xpaylabs.sdk.model.webhook.WebhookEvent;
+import com.xpaylabs.sdk.model.webhook.OrderWebhookData;
+import com.xpaylabs.sdk.model.webhook.CollectWebhookData;
 
 @RestController
 public class WebhookController {
@@ -259,7 +259,7 @@ public class WebhookController {
 The SDK throws `XPayApiException` for API errors:
 
 ```java
-import io.xpay.sdk.exception.XPayApiException;
+import com.xpaylabs.sdk.exception.XPayApiException;
 
 try {
   ApiResponse<PayoutData> response = xpay.createPayout(request);
