@@ -70,7 +70,7 @@ Rate limits vary by endpoint — `order/createCollection` and `order/createPayou
 ```
 api-reference/          — Full REST API docs (createCollection, createPayout, status, webhooks)
 concepts/               — Payments, settlements, webhooks, errors
-guides/                 — Accept payments, payouts, Node.js SDK, Spring Boot SDK, AI agents, testing, x402 protocol
+guides/                 — Accept payments, payouts, Node.js SDK, Java SDK (Spring Boot), AI agents, testing, x402 protocol
 ```
 
 ## Development

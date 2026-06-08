@@ -70,7 +70,7 @@ XPayLabs 以一组通过 Docker Compose 编排的微服务运行：
 ```
 api-reference/          — 完整 REST API 文档（createCollection、createPayout、状态查询、webhook）
 concepts/               — 支付、结算、webhook、错误处理
-guides/                 — 接收付款、付款、Node.js SDK、Spring Boot SDK、AI 代理、测试、x402 协议
+guides/                 — 接收付款、付款、Node.js SDK、Java SDK（Spring Boot）、AI 代理、测试、x402 协议
 ```
 
 ## 本地开发
