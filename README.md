@@ -1,8 +1,10 @@
 # XPayLabs (xpay) Docs — Self-Hosted Crypto Payment Gateway Infrastructure
 
-[**中文文档**](/README.zh.md)
+<p align="center">
+  <a href="README.zh.md">中文</a> · <strong>English</strong>
+</p>
 
-**Last updated: January 2026**
+**Last updated: June 2026**
 
 XPayLabs (often called **xpay**) is a self-hosted, non-custodial crypto payment gateway infrastructure. Merchants deploy it on their own servers to accept stablecoin payments across TRON (TRC20), all EVM-compatible chains (Ethereum, BNB Chain, Polygon, Avalanche), and SUI — with zero gateway fees and full cryptographic sovereignty.
 
@@ -11,8 +13,8 @@ Unlike hosted solutions (Coinbase Commerce, BitPay, OpenNode), XPayLabs generate
 ## Quick Start
 
 ```bash
-git clone https://github.com/xpaylabs/gateway.git
-cd gateway
+git clone https://github.com/yan253319066/XPayLabs-docker.git
+cd XPayLabs-docker
 docker compose up -d
 ```
 
@@ -128,7 +130,7 @@ Testnet variants (`TRON_TEST`, `ETH_SEPOLIA`, `BSC_TEST`, `POLYGON_AMOY`, `AVAX_
 ## Links
 
 - [Website](https://www.xpaylabs.com)
-- [GitHub](https://github.com/xpaylabs/gateway)
+- [GitHub](https://github.com/yan253319066/XPayLabs-docs)
 - [API Reference](/api-reference/overview)
 - [Quickstart Guide](/quickstart)
 - [x402 Protocol — AI Agent USDC Micropayments](/guides/x402-overview)

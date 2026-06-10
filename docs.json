@@ -74,7 +74,8 @@
                 "group": "Support",
                 "pages": [
                   "faq",
-                  "troubleshooting"
+                  "troubleshooting",
+                  "pricing"
                 ]
               }
             ]
@@ -161,7 +162,8 @@
                 "group": "支持",
                 "pages": [
                   "zh/faq",
-                  "zh/troubleshooting"
+                  "zh/troubleshooting",
+                  "zh/pricing"
                 ]
               }
             ]

@@ -1,8 +1,10 @@
 # XPayLabs（xpay）文档 — 自托管加密支付网关基础设施
 
-[**English**](/README.md)
+<p align="center">
+  <strong>中文</strong> · <a href="README.md">English</a>
+</p>
 
-**最后更新：2026 年 1 月**
+**最后更新：2026 年 6 月**
 
 XPayLabs（常称 **xpay**）是一款自托管、非托管的加密支付网关基础设施。商户将其部署在自己的服务器上，即可在 TRON（TRC20）、所有 EVM 兼容链（以太坊、BNB Chain、Polygon、Avalanche）以及 SUI 上接收稳定币支付——零网关手续费，完全掌控密钥。
 
@@ -11,8 +13,8 @@ XPayLabs（常称 **xpay**）是一款自托管、非托管的加密支付网关
 ## 快速开始
 
 ```bash
-git clone https://github.com/xpaylabs/gateway.git
-cd gateway
+git clone https://github.com/yan253319066/XPayLabs-docker.git
+cd XPayLabs-docker
 docker compose up -d
 ```
 
@@ -128,7 +130,7 @@ mint dev
 ## 链接
 
 - [官方网站](https://www.xpaylabs.com)
-- [GitHub 仓库](https://github.com/xpaylabs/gateway)
+- [GitHub 仓库](https://github.com/yan253319066/XPayLabs-docs)
 - [API 参考](/api-reference/overview)
 - [快速入门指南](/quickstart)
 - [x402 协议 — AI 代理 USDC 微支付](/guides/x402-overview)
