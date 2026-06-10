@@ -48,7 +48,7 @@ Visit the faucet for your chosen testnet and request test USDT or native tokens 
 ### 2. Create a Test Collection
 
 ```bash
-curl -X POST http://your-gateway:3010/v1/order/createCollection \
+curl -X POST http://your-gateway:180/v1/order/createCollection \
   -H "Content-Type: application/json" \
   -d '{
     "sign": "<computed_sign>",
@@ -80,7 +80,7 @@ Your configured webhook endpoint should receive events:
 ### 5. Test a Payout
 
 ```bash
-curl -X POST http://your-gateway:3010/v1/order/createPayout \
+curl -X POST http://your-gateway:180/v1/order/createPayout \
   -H "Content-Type: application/json" \
   -d '{
     "sign": "<computed_sign>",

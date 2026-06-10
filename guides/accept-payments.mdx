@@ -23,7 +23,7 @@ Call `POST /v1/order/createCollection` with the payment details:
 ```javascript
 import crypto from "crypto";
 
-const GATEWAY_URL = "http://your-gateway:3010";
+const GATEWAY_URL = "http://your-gateway:180";
 const MERCHANT_TOKEN = process.env.XPAYLABS_TOKEN;
 
 function signRequest(data) {
@@ -79,7 +79,7 @@ console.log(`Checkout page: ${payment.paymentUrl}`);
     "chain": "TRON",
     "orderId": "order_1042",
     "expiredTime": 1717086400,
-    "paymentUrl": "http://your-gateway:3010/checkout?orderId=order_1042"
+    "paymentUrl": "http://your-gateway:180/checkout?orderId=order_1042"
   }
 }
 ```
@@ -171,7 +171,7 @@ async function getOrderStatus(orderId, token) {
     .digest("hex");
 
   const response = await fetch(
-    `http://your-gateway:3010/v1/order/getOrderStatus?orderId=${orderId}&sign=${sign}`
+    `http://your-gateway:180/v1/order/getOrderStatus?orderId=${orderId}&sign=${sign}`
   );
   const result = await response.json();
   return result.data.status;

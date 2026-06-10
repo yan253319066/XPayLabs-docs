@@ -49,7 +49,7 @@ xpay:
 ### 2. 创建测试收款
 
 ```bash
-curl -X POST http://your-gateway:3010/v1/order/createCollection \
+curl -X POST http://your-gateway:180/v1/order/createCollection \
   -H "Content-Type: application/json" \
   -d '{
     "sign": "<computed_sign>",
@@ -80,7 +80,7 @@ curl -X POST http://your-gateway:3010/v1/order/createCollection \
 ### 5. 测试付款
 
 ```bash
-curl -X POST http://your-gateway:3010/v1/order/createPayout \
+curl -X POST http://your-gateway:180/v1/order/createPayout \
   -H "Content-Type: application/json" \
   -d '{
     "sign": "<computed_sign>",

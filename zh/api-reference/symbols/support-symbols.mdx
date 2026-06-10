@@ -9,7 +9,7 @@ keywords: ["代币", "支持代币", "查询", "GET", "API", "XPayLabs"]
 
 ## 请求
 
-**`GET http://your-gateway:3010/v1/symbol/supportSymbols`**
+**`GET http://your-gateway:180/v1/symbol/supportSymbols`**
 
 ### 查询参数
 
@@ -25,13 +25,13 @@ keywords: ["代币", "支持代币", "查询", "GET", "API", "XPayLabs"]
 
 ```bash
 # 所有支持的代币
-curl http://your-gateway:3010/v1/symbol/supportSymbols
+curl http://your-gateway:180/v1/symbol/supportSymbols
 
 # 按链过滤
-curl "http://your-gateway:3010/v1/symbol/supportSymbols?chain=TRON"
+curl "http://your-gateway:180/v1/symbol/supportSymbols?chain=TRON"
 
 # 按代币符号过滤
-curl "http://your-gateway:3010/v1/symbol/supportSymbols?symbol=USDT"
+curl "http://your-gateway:180/v1/symbol/supportSymbols?symbol=USDT"
 ```
 
 ---

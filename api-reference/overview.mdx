@@ -8,10 +8,10 @@ XPayLabs exposes a RESTful API over HTTP. Every request uses a standard signed e
 
 ## Base URL
 
-All API requests target your self-hosted gateway. The default port is `3010`:
+All API requests target your self-hosted gateway via the nginx gateway. The default external port is `180`:
 
 ```
-http://your-server:3010/v1
+http://your-server:180/v1
 ```
 
 If you are running behind a reverse proxy (Nginx, Caddy), use your configured HTTPS domain.

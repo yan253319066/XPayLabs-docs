@@ -9,10 +9,10 @@ XPayLabs 通过 HTTP 暴露 RESTful API。每个请求都使用标准的已签�
 
 ## 基础 URL
 
-所有 API 请求都指向您的自托管网关。默认端口为 `3010`：
+所有 API 请求都通过 nginx 网关指向您的自托管网关。默认外部端口为 `180`：
 
 ```
-http://your-server:3010/v1
+http://your-server:180/v1
 ```
 
 如果您在反向代理（Nginx、Caddy）后运行，请使用您配置的 HTTPS 域名。

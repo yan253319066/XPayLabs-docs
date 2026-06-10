@@ -61,7 +61,7 @@ XPayLabs 使用标准的 `R<T>` 信封返回错误，带有与 HTTP 兼容的 `c
 
 ```javascript
 async function createCollection(payload) {
-  const response = await fetch("http://your-gateway:3010/v1/order/createCollection", {
+  const response = await fetch("http://your-gateway:180/v1/order/createCollection", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),

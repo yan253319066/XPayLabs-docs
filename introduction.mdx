@@ -38,7 +38,7 @@ XPayLabs natively supports the following blockchain networks:
 
 <Steps>
   <Step title="Deploy the gateway">
-    Run `docker compose up -d` on your server. The XPayLabs core container starts all services — API server, blockchain scanners, webhook dispatcher, and the checkout UI.
+    Run `docker compose up -d` on your server. All services start together — Java backends (xpay-user, xpay-merchant, xpay-eth, xpay-tron, xpay-sui), blockchain scanners, webhook dispatcher, and the checkout UI.
   </Step>
   <Step title="Generate API credentials">
     Configure your merchant token in the gateway dashboard. This token is used to sign every API request with HMAC-SHA256.

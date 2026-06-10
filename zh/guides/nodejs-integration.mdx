@@ -23,7 +23,7 @@ import { XPay } from '@xpaylabs/node-sdk';
 const xpay = new XPay({
   apiKey: 'your-merchant-token',
   apiSecret: 'your-api-secret',
-  baseUrl: 'http://your-gateway:3010',
+  baseUrl: 'http://your-gateway:180',
   timeout: 30000,
 });
 ```
@@ -42,7 +42,7 @@ const xpay = new XPay({
 ```typescript
 import { XPay } from '@xpaylabs/node-sdk';
 
-const xpay = new XPay({ apiKey: '...', apiSecret: '...', baseUrl: 'http://your-gateway:3010' });
+const xpay = new XPay({ apiKey: '...', apiSecret: '...', baseUrl: 'http://your-gateway:180' });
 
 async function createPayment(uid: string, amount: number) {
   const collection = await xpay.createCollection({

@@ -27,7 +27,7 @@ keywords: ["XPayLabs", "Docker Compose", "部署", "快速开始", "加密支付
     docker compose up -d
     ```
 
-    这将启动核心 API 服务器（端口 `3010`）、区块链扫描器、Webhook 分发器和结账 UI。验证所有服务是否正常运行：
+    这将启动所有服务，包括 Java 后端（xpay-user、xpay-merchant、xpay-eth、xpay-tron、xpay-sui）、区块链扫描器和结账 UI。验证所有服务是否正常运行：
 
     ```bash
     docker compose ps
@@ -37,21 +37,7 @@ keywords: ["XPayLabs", "Docker Compose", "部署", "快速开始", "加密支付
   </Step>
 
   <Step title="配置您的商家令牌">
-    XPayLabs 使用 HMAC-SHA256 签名对 API 请求进行身份验证。您的商家令牌在网关配置文件中配置：
-
-    ```yaml
-    # config/application.yml
-    xpay:
-      merchant:
-        token: "your-merchant-token-here"
-        webhook-secret: "your-webhook-secret-here"
-    ```
-
-    更改配置后重启核心容器：
-
-    ```bash
-    docker compose restart core
-    ```
+    XPayLabs 使用 HMAC-SHA256 签名对 API 请求进行身份验证。您的商家令牌在创建商户账号时由网关管理面板生成。
 
     <Note>
       商家令牌是一个共享密钥。它永远不会直接出现在 API 请求中——相反，您使用它对请求负载进行签名。请安全存储，切勿提交到版本控制系统。
@@ -64,7 +50,7 @@ keywords: ["XPayLabs", "Docker Compose", "部署", "快速开始", "加密支付
     ```bash
     # 将 TOKEN 替换为您的商家令牌
     curl --request POST \
-      --url http://your-server:3010/v1/order/createCollection \
+      --url http://your-server:180/v1/order/createCollection \
       --header "Content-Type: application/json" \
       --data '{
         "sign": "generated_hmac_signature",

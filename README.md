@@ -18,7 +18,7 @@ cd XPayLabs-docker
 docker compose up -d
 ```
 
-The API server starts on port `3010`. Full deployment instructions are in the [quickstart guide](/quickstart).
+The API server starts on port `180`. Full deployment instructions are in the [quickstart guide](/quickstart).
 
 ## Key Features
 
@@ -43,7 +43,7 @@ XPayLabs runs as a set of microservices orchestrated via Docker Compose:
 
 ## API Overview
 
-Base URL: `http://your-gateway:3010/v1`
+Base URL: `http://your-gateway:180/v1`
 
 All requests use the `ReqPayload` envelope format:
 

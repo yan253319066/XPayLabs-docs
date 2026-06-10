@@ -60,7 +60,7 @@ XPayLabs returns errors using a standard `R<T>` envelope with an HTTP-compatible
 
 ```javascript
 async function createCollection(payload) {
-  const response = await fetch("http://your-gateway:3010/v1/order/createCollection", {
+  const response = await fetch("http://your-gateway:180/v1/order/createCollection", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),

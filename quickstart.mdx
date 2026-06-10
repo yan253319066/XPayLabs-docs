@@ -26,7 +26,7 @@ Deploy XPayLabs with Docker Compose and create your first collection order in un
     docker compose up -d
     ```
 
-    This starts the core API server (port `3010`), blockchain scanners, webhook dispatcher, and the checkout UI. Verify everything is running:
+    This starts all services including Java backends (xpay-user, xpay-merchant, xpay-eth, xpay-tron, xpay-sui), blockchain scanners, and the checkout UI. Verify everything is running:
 
     ```bash
     docker compose ps
@@ -36,21 +36,7 @@ Deploy XPayLabs with Docker Compose and create your first collection order in un
   </Step>
 
   <Step title="Configure your merchant token">
-    XPayLabs authenticates API requests using HMAC-SHA256 signatures. Your merchant token is configured in the gateway configuration file:
-
-    ```yaml
-    # config/application.yml
-    xpay:
-      merchant:
-        token: "your-merchant-token-here"
-        webhook-secret: "your-webhook-secret-here"
-    ```
-
-    Restart the core container after making changes:
-
-    ```bash
-    docker compose restart core
-    ```
+    XPayLabs authenticates API requests using HMAC-SHA256 signatures. Your merchant token is generated in the gateway dashboard when you create your merchant account.
 
     <Note>
       The merchant token is a shared secret. It never appears in API requests directly — instead, you use it to sign request payloads. Store it securely and never commit it to version control.
@@ -63,7 +49,7 @@ Deploy XPayLabs with Docker Compose and create your first collection order in un
     ```bash
     # Replace TOKEN with your merchant token
     curl --request POST \
-      --url http://your-server:3010/v1/order/createCollection \
+      --url http://your-server:180/v1/order/createCollection \
       --header "Content-Type: application/json" \
       --data '{
         "sign": "generated_hmac_signature",

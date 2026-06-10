@@ -18,7 +18,7 @@ cd XPayLabs-docker
 docker compose up -d
 ```
 
-API 服务器启动在 `3010` 端口。完整部署说明请参阅[快速入门指南](/quickstart)。
+API 服务器启动在 `180` 端口。完整部署说明请参阅[快速入门指南](/quickstart)。
 
 ## 核心功能
 
@@ -43,7 +43,7 @@ XPayLabs 以一组通过 Docker Compose 编排的微服务运行：
 
 ## API 概览
 
-基础 URL：`http://your-gateway:3010/v1`
+基础 URL：`http://your-gateway:180/v1`
 
 所有请求使用 `ReqPayload` 信封格式：
 

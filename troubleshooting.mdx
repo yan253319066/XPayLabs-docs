@@ -76,7 +76,7 @@ If the scanner is not detecting incoming payments:
 
 1. **Verify callback URL:** Check the `callback-url` in your gateway configuration.
 2. **Network accessibility:** The gateway must be able to reach your callback URL. If testing locally, use a tunneling tool like ngrok.
-3. **Check gateway logs:** `docker logs <core-container-name>` to see webhook delivery attempts.
+3. **Check gateway logs:** `docker compose logs xpay-user` to see webhook delivery attempts.
 4. **Check your endpoint logs:** Ensure your server is listening on the correct path and returning HTTP 200.
 
 ### Why is webhook signature verification failing?
@@ -96,21 +96,21 @@ If the scanner is not detecting incoming payments:
 docker compose ps
 
 # View logs for a specific service
-docker compose logs core
-docker compose logs scanner-tron
+docker compose logs xpay-user
+docker compose logs xpay-tron
 ```
 
 Common causes:
-- Port `3010` already in use
+- Port `180` already in use
 - Insufficient disk space
 - Missing environment variables in configuration
 
 ### Why is the gateway not responding?
 
 1. **Verify container is running:** `docker compose ps` should show `Up` status.
-2. **Check port binding:** `docker compose port core 3010`
-3. **Test locally:** `curl http://localhost:3010/v1/symbol/supportSymbols`
-4. **Check firewall:** Ensure port 3010 is open in your server firewall.
+2. **Check port binding:** `docker compose port gateway 180`
+3. **Test locally:** `curl http://localhost:180/v1/symbol/supportSymbols`
+4. **Check firewall:** Ensure port 180 is open in your server firewall.
 
 ---
 

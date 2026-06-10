@@ -77,7 +77,7 @@ console.log(sign); // 应当与网关期望的值匹配
 
 1. **验证回调 URL：** 检查网关配置中的 `callback-url`。
 2. **网络可达性：** 网关必须能够到达您的回调 URL。如果在本地测试，请使用 ngrok 等隧道工具。
-3. **检查网关日志：** `docker logs <core-container-name>` 查看 Webhook 投递尝试。
+3. **检查网关日志：** `docker compose logs xpay-user` 查看 Webhook 投递尝试。
 4. **检查您的端点日志：** 确保您的服务器正在监听正确的路径并返回 HTTP 200。
 
 ### 为什么 Webhook 签名验证失败？
@@ -97,21 +97,21 @@ console.log(sign); // 应当与网关期望的值匹配
 docker compose ps
 
 # 查看特定服务的日志
-docker compose logs core
-docker compose logs scanner-tron
+docker compose logs xpay-user
+docker compose logs xpay-tron
 ```
 
 常见原因：
-- 端口 `3010` 已被占用
+- 端口 `180` 已被占用
 - 磁盘空间不足
 - 配置中缺少环境变量
 
 ### 为什么网关没有响应？
 
 1. **确认容器正在运行：** `docker compose ps` 应显示 `Up` 状态。
-2. **检查端口绑定：** `docker compose port core 3010`
-3. **本地测试：** `curl http://localhost:3010/v1/symbol/supportSymbols`
-4. **检查防火墙：** 确保服务器防火墙中已开放 3010 端口。
+2. **检查端口绑定：** `docker compose port gateway 180`
+3. **本地测试：** `curl http://localhost:180/v1/symbol/supportSymbols`
+4. **检查防火墙：** 确保服务器防火墙中已开放 180 端口。
 
 ---
 

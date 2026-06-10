@@ -39,7 +39,7 @@ XPayLabs 原生支持以下区块链网络：
 
 <Steps>
   <Step title="部署网关">
-    在您的服务器上运行 `docker compose up -d`。XPayLabs 核心容器启动所有服务——API 服务器、区块链扫描器、Webhook 分发器和结账 UI。
+    在您的服务器上运行 `docker compose up -d`。所有服务一起启动——Java 后端（xpay-user、xpay-merchant、xpay-eth、xpay-tron、xpay-sui）、区块链扫描器、Webhook 分发器和结账 UI。
   </Step>
   <Step title="生成 API 凭证">
     在网关管理面板中配置您的商家令牌。该令牌用于使用 HMAC-SHA256 签署每个 API 请求。

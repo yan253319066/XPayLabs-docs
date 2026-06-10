@@ -8,7 +8,7 @@ Returns the list of supported symbols (tokens) configured on your gateway. The g
 
 ## Request
 
-**`GET http://your-gateway:3010/v1/symbol/supportSymbols`**
+**`GET http://your-gateway:180/v1/symbol/supportSymbols`**
 
 ### Query Parameters
 
@@ -24,13 +24,13 @@ Returns the list of supported symbols (tokens) configured on your gateway. The g
 
 ```bash
 # All supported symbols
-curl http://your-gateway:3010/v1/symbol/supportSymbols
+curl http://your-gateway:180/v1/symbol/supportSymbols
 
 # Filter by chain
-curl "http://your-gateway:3010/v1/symbol/supportSymbols?chain=TRON"
+curl "http://your-gateway:180/v1/symbol/supportSymbols?chain=TRON"
 
 # Filter by symbol
-curl "http://your-gateway:3010/v1/symbol/supportSymbols?symbol=USDT"
+curl "http://your-gateway:180/v1/symbol/supportSymbols?symbol=USDT"
 ```
 
 ---
