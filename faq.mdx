@@ -59,7 +59,7 @@ Answers to frequently asked questions about XPayLabs — deployment, supported b
 ## Deployment
 
 <Accordion title="How do I deploy XPayLabs?">
-  Clone the repository and run `docker compose up -d`. Configure your blockchain RPC endpoints, generate a wallet seed phrase, and set your merchant token. The gateway exposes the API on port 3010.
+   Clone the repository and run `docker compose up -d`. Configure your blockchain RPC endpoints, generate a wallet seed phrase, and set up your merchant account in the gateway dashboard. Access the API via the gateway on port `180`.
 </Accordion>
 
 <Accordion title="Do I need blockchain RPC endpoints?">
@@ -67,7 +67,7 @@ Answers to frequently asked questions about XPayLabs — deployment, supported b
 </Accordion>
 
 <Accordion title="Can I use a reverse proxy?">
-  Yes. It is recommended to place XPayLabs behind Nginx or Caddy for TLS termination and domain routing. The gateway itself serves HTTP on port 3010.
+   Yes. It is recommended to place XPayLabs behind Nginx or Caddy for TLS termination and domain routing. The Java backends serve on internal ports (xpay-user:8077, xpay-merchant:8078), and the nginx gateway routes external traffic.
 </Accordion>
 
 ## Security
@@ -81,7 +81,7 @@ Answers to frequently asked questions about XPayLabs — deployment, supported b
 </Accordion>
 
 <Accordion title="How do I secure the gateway?">
-  - Place the gateway behind a firewall, accepting only necessary traffic on port 3010.
+   - Place the gateway behind a firewall, accepting only necessary traffic on port 180.
   - Use a reverse proxy with TLS for all external-facing endpoints.
   - Restrict dashboard access to your internal network or VPN.
   - Regularly backup your wallet seed phrase offline.

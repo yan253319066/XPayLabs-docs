@@ -60,7 +60,7 @@ keywords: ["XPayLabs", "FAQ", "常见问题", "加密支付", "自托管", "非�
 ## 部署
 
 <Accordion title="如何部署 XPayLabs？">
-  克隆仓库并运行 `docker compose up -d`。配置您的区块链 RPC 端点，生成钱包助记词，并设置您的商家令牌。网关在 3010 端口暴露 API。
+   克隆仓库并运行 `docker compose up -d`。配置您的区块链 RPC 端点，生成钱包助记词，并在网关管理面板中设置您的商户账号。通过网关在端口 `180` 访问 API。
 </Accordion>
 
 <Accordion title="我需要区块链 RPC 端点吗？">
@@ -68,7 +68,7 @@ keywords: ["XPayLabs", "FAQ", "常见问题", "加密支付", "自托管", "非�
 </Accordion>
 
 <Accordion title="我可以使用反向代理吗？">
-  可以。建议将 XPayLabs 置于 Nginx 或 Caddy 之后，以实现 TLS 终止和域名路由。网关本身在 3010 端口上提供 HTTP 服务。
+   可以。建议将 XPayLabs 置于 Nginx 或 Caddy 之后，以实现 TLS 终止和域名路由。Java 后端在内部端口上提供服务（xpay-user:8077、xpay-merchant:8078），nginx 网关路由外部流量。
 </Accordion>
 
 ## 安全
@@ -82,7 +82,7 @@ keywords: ["XPayLabs", "FAQ", "常见问题", "加密支付", "自托管", "非�
 </Accordion>
 
 <Accordion title="如何保护网关安全？">
-  - 将网关置于防火墙之后，仅在 3010 端口接受必要流量。
+   - 将网关置于防火墙之后，仅在 180 端口接受必要流量。
   - 对所有面向外部的端点使用带 TLS 的反向代理。
   - 将管理面板访问限制在内部网络或 VPN 内。
   - 定期离线备份您的钱包助记词。
