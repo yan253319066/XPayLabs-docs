@@ -67,7 +67,7 @@ curl http://your-gateway:3010/v1/order/status/order_1042 \
 </ResponseField>
 
 <ResponseField name="fee" type="string">
-  扣除的平台处理费用。零费用配置下为 `"0"`。
+  平台处理手续费。由平台运营者配置费率结构；设置为 `"0.00"` 时不收取任何费用。
 </ResponseField>
 
 <ResponseField name="transaction" type="object | null">
