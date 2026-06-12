@@ -59,10 +59,19 @@ sign = HEX(HMAC-SHA256(JSON.stringify(data), merchant_token))
 ```javascript
 import crypto from "crypto";
 
+function sortKeys(obj) {
+  return Object.keys(obj)
+    .sort()
+    .reduce((acc, k) => {
+      acc[k] = obj[k];
+      return acc;
+    }, {});
+}
+
 function signRequest(data, token) {
   return crypto
     .createHmac("sha256", token)
-    .update(JSON.stringify(data), "utf8")
+    .update(JSON.stringify(sortKeys(data)), "utf8")
     .digest("hex");
 }
 ```
@@ -80,14 +89,18 @@ def sign_request(data: dict, token: str) -> str:
 ### Java
 
 ```java
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
-import java.security.MessageDigest;
 
-public static String signRequest(String dataJson, String token) throws Exception {
+public static String signRequest(Object data, String token) throws Exception {
+    ObjectMapper mapper = new ObjectMapper();
+    mapper.enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS);
+    String json = mapper.writeValueAsString(data);
     Mac mac = Mac.getInstance("HmacSHA256");
     mac.init(new SecretKeySpec(token.getBytes("UTF-8"), "HmacSHA256"));
-    byte[] digest = mac.doFinal(dataJson.getBytes("UTF-8"));
+    byte[] digest = mac.doFinal(json.getBytes("UTF-8"));
     return bytesToHex(digest);
 }
 ```

@@ -39,7 +39,7 @@ XPayLabs 以一组通过 Docker Compose 编排的微服务运行：
 - **Core API** — 账单生命周期、充值地址生成、商户认证
 - **区块链扫描器** — 跨所有支持链的并发内存池监控
 - **Webhook 调度器** — 签名事件投递，自动重试（1 秒 → 5 秒 → 30 秒 → 5 分钟）
-- **结账 UI** — 白标 React 支付界面
+- **结账 UI** — 白标支付界面（Vue 3）
 
 ## API 概览
 
@@ -110,10 +110,13 @@ mint dev
 | Ethereum | `ETH` | USDT、USDC、DAI |
 | BNB Chain | `BSC` | USDT、USDC、BUSD |
 | Polygon | `POLYGON` | USDT、USDC、DAI |
+| Arbitrum | `ARBITRUM` | USDT、USDC |
+| Optimism | `OPTIMISM` | USDT、USDC |
+| Base | `BASE` | USDT、USDC |
 | Avalanche C-Chain | `AVAX_C_CHAIN` | USDT、USDC |
 | SUI | `SUI` | USDC |
 
-测试网络（`TRON_TEST`、`ETH_SEPOLIA`、`BSC_TEST`、`POLYGON_AMOY`、`AVAX_FUJI_TEST`、`SUI_TEST`）可用于开发和测试。
+测试网络（`TRON_TEST`、`ETH_SEPOLIA`、`BSC_TEST`、`POLYGON_AMOY`、`ARBITRUM_SEPOLIA`、`OPTIMISM_SEPOLIA`、`BASE_SEPOLIA`、`AVAX_FUJI_TEST`、`SUI_TEST`）可用于开发和测试。
 
 ## 常见问题
 

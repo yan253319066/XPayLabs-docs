@@ -106,8 +106,9 @@ console.log(`结账页面: ${payment.paymentUrl}`);
 在网关中配置您的回调 URL。当检测并确认支付后，网关会发送一个已签名的 `POST` 请求：
 
 ```javascript
-const express = require("express");
-const crypto = require("crypto");
+// Express.js webhook handler
+import express from "express";
+import crypto from "crypto";
 
 const app = express();
 app.use(express.json());

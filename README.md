@@ -39,7 +39,7 @@ XPayLabs runs as a set of microservices orchestrated via Docker Compose:
 - **Core API** — Invoice lifecycle, deposit address generation, merchant authentication
 - **Blockchain scanners** — Concurrent mempool monitoring across all supported chains
 - **Webhook dispatcher** — Signed event delivery with automatic retry (1s → 5s → 30s → 5min)
-- **Checkout UI** — White-label React payment interface
+- **Checkout UI** — White-label Vue 3 payment interface
 
 ## API Overview
 
@@ -110,10 +110,13 @@ For a business processing $100,000 monthly in crypto payments, self-hosting with
 | Ethereum | `ETH` | USDT, USDC, DAI |
 | BNB Chain | `BSC` | USDT, USDC, BUSD |
 | Polygon | `POLYGON` | USDT, USDC, DAI |
+| Arbitrum | `ARBITRUM` | USDT, USDC |
+| Optimism | `OPTIMISM` | USDT, USDC |
+| Base | `BASE` | USDT, USDC |
 | Avalanche C-Chain | `AVAX_C_CHAIN` | USDT, USDC |
 | SUI | `SUI` | USDC |
 
-Testnet variants (`TRON_TEST`, `ETH_SEPOLIA`, `BSC_TEST`, `POLYGON_AMOY`, `AVAX_FUJI_TEST`, `SUI_TEST`) are available for development and testing.
+Testnet variants (`TRON_TEST`, `ETH_SEPOLIA`, `BSC_TEST`, `POLYGON_AMOY`, `ARBITRUM_SEPOLIA`, `OPTIMISM_SEPOLIA`, `BASE_SEPOLIA`, `AVAX_FUJI_TEST`, `SUI_TEST`) are available for development and testing.
 
 ## Frequently Asked Questions
 
