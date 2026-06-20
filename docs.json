@@ -1,7 +1,7 @@
 {
   "$schema": "https://mintlify.com/docs.json",
   "theme": "luma",
-  "name": "XPayLabs (xpay)",
+  "name": "XPay Labs (xpay)",
   "description": "Documentation for XPayLabs (xpay) — self-hosted, non-custodial crypto payment infrastructure. Accept stablecoin payments on TRON, EVM chains, and SUI with zero gateway fees.",
   "colors": {
     "primary": "#54545c"
