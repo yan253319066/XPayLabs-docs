@@ -138,3 +138,8 @@ mint dev
 - [快速入门指南](/quickstart)
 - [x402 协议 — AI 代理 USDC 微支付](/guides/x402-overview)
 - [定价方案](https://www.xpaylabs.com/zh/pricing)
+
+## 仓库
+
+**GitHub:** [yan253319066/XPayLabs-docs](https://github.com/yan253319066/XPayLabs-docs)
+**Gitee（镜像）:** [XPayLabs/XPayLabs-docs](https://gitee.com/XPayLabs/XPayLabs-docs)
