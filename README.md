@@ -138,3 +138,8 @@ Testnet variants (`TRON_TEST`, `ETH_SEPOLIA`, `BSC_TEST`, `POLYGON_AMOY`, `ARBIT
 - [Quickstart Guide](/quickstart)
 - [x402 Protocol — AI Agent USDC Micropayments](/guides/x402-overview)
 - [Pricing](https://www.xpaylabs.com/pricing)
+
+## Repository
+
+**GitHub:** [yan253319066/XPayLabs-docs](https://github.com/yan253319066/XPayLabs-docs)
+**Gitee (mirror):** [XPayLabs/XPayLabs-docs](https://gitee.com/XPayLabs/XPayLabs-docs)
