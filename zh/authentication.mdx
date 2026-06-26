@@ -2,7 +2,7 @@
 title: "HMAC-SHA256 身份认证：XPayLabs API 安全"
 sidebarTitle: "身份认证"
 description: "XPayLabs 使用 HMAC-SHA256 请求签名对每个 API 请求进行身份验证。使用您的商家令牌计算签名字段以确保加密支付 API 调用的安全。"
-keywords: ["HMAC-SHA256", "身份认证", "API 安全", "签名", "商家令牌", "XPayLabs"]
+keywords: ["HMAC-SHA256 身份认证", "API 请求签名", "加密支付 API 安全", "商家令牌认证", "XPayLabs API 鉴权", "防重放攻击 API", "区块链支付安全"]
 ---
 
 XPayLabs 使用 HMAC-SHA256 请求签名对每个 API 请求进行身份验证。与传统的 Bearer 令牌身份认证不同，XPayLabs 要求每个请求都包含一个基于请求负载计算的加密签名。这确保了请求的完整性并防止重放攻击。

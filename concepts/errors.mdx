@@ -2,6 +2,7 @@
 title: "XPayLabs API Errors: Codes, Causes, and Solutions"
 sidebarTitle: "Errors"
 description: "XPayLabs returns structured error responses with HTTP status codes and validation error messages. Handle blockchain payment errors gracefully with our troubleshooting guide."
+keywords: ["crypto API errors", "payment gateway error codes", "HMAC signing errors", "XPayLabs error handling", "API rate limiting crypto", "blockchain payment validation errors"]
 ---
 
 XPayLabs returns errors using a standard `R<T>` envelope with an HTTP-compatible `code` and a human-readable `msg`. Unlike traditional payment processors, XPayLabs errors are primarily validation and authentication errors — since blockchain transactions are final, there are no "card declined" or "insufficient funds" errors at the API level (those are blockchain-level issues).
