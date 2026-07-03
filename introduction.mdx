@@ -42,6 +42,40 @@ XPayLabs natively supports the following blockchain networks:
 | **Avalanche C-Chain** | ERC20 | USDT, USDC |
 | **SUI** | Native | USDC |
 
+## Architecture
+
+XPayLabs runs as 11 Docker containers orchestrated via Docker Compose. A single Nginx gateway serves as the public entry point, routing requests to backend services and frontend UIs.
+
+```mermaid architecture
+graph TD
+    GATEWAY["nginx:alpine<br/>Gateway :180"]
+    MYSQL[("MySQL 8.0<br/>:13306")]
+    REDIS[("Redis 7<br/>:16379")]
+
+    GATEWAY -->|"/api/"| USER["xpay-user :8077<br/>Collection API"]
+    GATEWAY -->|"/prod-api/"| MERCHANT["xpay-merchant :8078<br/>Admin API"]
+    GATEWAY -->|"/checkout"| CHECKOUT["checkout :80<br/>Vue 3"]
+    GATEWAY -->|"/"| DASHBOARD["merchant-vue :80<br/>Dashboard"]
+
+    USER --> MYSQL
+    USER --> REDIS
+    MERCHANT --> MYSQL
+    MERCHANT --> REDIS
+
+    subgraph Blockchain Scanners
+        ETH["xpay-eth :8076<br/>EVM Scanner"]
+        TRON["xpay-tron :8075<br/>TRON Scanner"]
+        SUI["xpay-sui :8074<br/>SUI Scanner"]
+    end
+
+    ETH --> MYSQL
+    TRON --> MYSQL
+    SUI --> MYSQL
+    SUI -->|RPC| SUI_PROXY["sui-node-service<br/>:13001"]
+```
+
+*11 microservices: 1 gateway, 2 data stores, 3 blockchain scanners, 1 SUI RPC proxy, 2 backend APIs, 2 frontend UIs.*
+
 ## How does XPayLabs process payments?
 
 <Steps>
