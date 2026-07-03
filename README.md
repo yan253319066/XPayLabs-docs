@@ -139,6 +139,10 @@ Testnet variants (`TRON_TEST`, `ETH_SEPOLIA`, `BSC_TEST`, `POLYGON_AMOY`, `ARBIT
 - [x402 Protocol — AI Agent USDC Micropayments](/guides/x402-overview)
 - [Pricing](https://www.xpaylabs.com/pricing)
 
+🌟 **Enjoying XPayLabs?** [Star this repo](https://github.com/yan253319066/XPayLabs-docs) — it helps others discover self-hosted crypto payment infrastructure.
+
+---
+
 ## Repository
 
 **GitHub:** [yan253319066/XPayLabs-docs](https://github.com/yan253319066/XPayLabs-docs)
